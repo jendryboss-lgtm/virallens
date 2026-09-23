@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { Alert, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Chip, Screen, TextField } from '@/components/ui';
 import { useAuthStore, useBillingStore } from '@/store';
 import { signOut } from '@/features/auth/api';
 import { updatePreferences, deleteAccountAndData } from '@/features/settings/api';
-import { restorePurchases, hasProEntitlement } from '@/lib/revenuecat';
+import {
+  restorePurchases,
+  hasProEntitlement,
+  presentCustomerCenter,
+} from '@/lib/revenuecat';
 import { refreshBillingState, planLabel } from '@/features/billing/sync';
 import {
   platformOptions,
@@ -15,9 +19,6 @@ import {
 } from '@/features/onboarding/prefs';
 import { colors, spacing, typography } from '@/theme';
 import type { ExperienceLevel, GrowthGoal, NichePref, PlatformPref } from '@/types/database';
-
-const MANAGE_SUB_URL_IOS = 'https://apps.apple.com/account/subscriptions';
-const MANAGE_SUB_URL_ANDROID = 'https://play.google.com/store/account/subscriptions';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -72,11 +73,13 @@ export default function SettingsScreen() {
     }
   }
 
-  function onManageSubscription() {
-    const url = Platform.OS === 'ios' ? MANAGE_SUB_URL_IOS : MANAGE_SUB_URL_ANDROID;
-    Linking.openURL(url).catch(() => {
+  async function onManageSubscription() {
+    try {
+      // Customer Center when RC configured; otherwise opens store subscription URL.
+      await presentCustomerCenter();
+    } catch {
       router.push('/(paywall)/index');
-    });
+    }
   }
 
   async function onSignOut() {

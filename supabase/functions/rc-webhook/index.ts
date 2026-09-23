@@ -1,6 +1,10 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabase.ts';
-import { PRODUCT_IDS, resolvePlanFromProduct, type PlanType } from '../_shared/quotas.ts';
+import {
+  isProProductOrEntitlement,
+  resolvePlanFromProduct,
+  type PlanType,
+} from '../_shared/quotas.ts';
 
 /**
  * RevenueCat webhook — source of truth for Pro entitlement.
@@ -54,10 +58,7 @@ Deno.serve(async (req) => {
       'SUBSCRIBER_ALIAS',
     ]);
 
-    const hasProEntitlement =
-      entitlementIds.includes('pro') ||
-      productId === PRODUCT_IDS.monthly ||
-      productId === PRODUCT_IDS.annual;
+    const hasProEntitlement = isProProductOrEntitlement(productId, entitlementIds);
 
     let entitlementActive = false;
     let status: string = 'inactive';
@@ -69,7 +70,7 @@ Deno.serve(async (req) => {
       status = isTrialing ? 'trialing' : 'active';
       plan = resolvePlanFromProduct(productId, isTrialing);
     } else if (type === 'CANCELLATION' && hasProEntitlement) {
-      // Still entitled until expiration
+      // Still entitled until expiration (lifetime has no expiration — keep active)
       entitlementActive = true;
       status = 'canceled';
       plan = resolvePlanFromProduct(productId, isTrialing);

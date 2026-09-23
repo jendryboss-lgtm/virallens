@@ -8,8 +8,8 @@ Use before local run, EAS build, or function deploy. **Do not commit secrets.**
 |----------|----------|-------|
 | `EXPO_PUBLIC_SUPABASE_URL` | Yes | `https://….supabase.co` |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon/public key only |
-| `EXPO_PUBLIC_REVENUECAT_IOS_KEY` | iOS | `appl_…` |
-| `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | Android | `goog_…` |
+| `EXPO_PUBLIC_REVENUECAT_IOS_KEY` | iOS | `test_…` (Test Store) or `appl_…` (prod) |
+| `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | Android | `test_…` (same Test Store key OK) or `goog_…` (prod) |
 | `EXPO_PUBLIC_PRIVACY_URL` | Recommended | Default `https://virallens.app/privacy` |
 | `EXPO_PUBLIC_TERMS_URL` | Recommended | Default `https://virallens.app/terms` |
 
@@ -32,10 +32,11 @@ Auto-injected: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## RevenueCat
 
-- [ ] Entitlement `pro`
-- [ ] Products `virallens_pro_monthly` / `virallens_pro_annual`
+- [ ] Entitlement `virallens_pro`
+- [ ] Products `monthly` / `yearly` / `lifetime` attached to entitlement
+- [ ] Current Offering + Paywall editor + Customer Center
 - [ ] Webhook → `…/functions/v1/rc-webhook` with bearer secret
-- [ ] Offering attached
+- [ ] See `docs/revenuecat-expo.md`
 
 ## EAS / stores
 

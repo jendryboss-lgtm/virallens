@@ -10,7 +10,7 @@ Exact steps for Supabase, secrets, RevenueCat webhook, EAS build/submit, and Tes
 - Apple Developer + App Store Connect access
 - Google Play Console (Android)
 - Gemini API key (Google AI Studio)
-- RevenueCat project with `pro` entitlement
+- RevenueCat project with `virallens_pro` entitlement
 
 ## 1. Clone & env
 
@@ -71,9 +71,11 @@ Confirm private bucket `videos` exists (created by migration).
 
 ## 3. RevenueCat
 
-1. Entitlement: `pro`  
-2. Products: `virallens_pro_monthly`, `virallens_pro_annual` (3-day intro trial)  
-3. Attach to current Offering  
+See **[docs/revenuecat-expo.md](revenuecat-expo.md)** for the full Expo + Paywalls checklist.
+
+1. Entitlement: `virallens_pro`  
+2. Products: `monthly`, `yearly`, `lifetime` (3-day intro trial on yearly where offered)  
+3. Attach products to entitlement + current Offering; design Paywall + Customer Center  
 4. Webhook URL:
 
 ```
@@ -81,9 +83,11 @@ https://YOUR_PROJECT.supabase.co/functions/v1/rc-webhook
 ```
 
 Authorization: Bearer `REVENUECAT_WEBHOOK_SECRET`  
-5. Identify with Supabase user UUID (`Purchases.logIn`)
+5. Identify with Supabase user UUID (`Purchases.logIn`)  
+6. Keys: Test Store `test_…` for local; `appl_` / `goog_` for store builds
 
-Unlock rule: webhook sets `subscriptions.entitlement_active`. Client cannot unlock Pro locally.
+Unlock rule: webhook sets `subscriptions.entitlement_active`. Client cannot unlock Pro locally.  
+Yearly and lifetime map to DB plan `annual` (lifetime uses annual quota; no enum migration).
 
 ## 4. EAS project
 

@@ -11,7 +11,7 @@ Production Expo (React Native + TypeScript) app for directional short-form video
 - Expo SDK 57 + Expo Router + TypeScript
 - Supabase (Auth, Postgres, Storage, Realtime, Edge Functions)
 - Gemini multimodal (Edge Functions only — never in the mobile app)
-- RevenueCat (`pro` entitlement)
+- RevenueCat (`virallens_pro` entitlement + `react-native-purchases-ui`)
 - TanStack Query, Zustand, Zod, React Hook Form
 - StyleSheet design system, EAS, Jest, ESLint, Prettier
 
@@ -19,11 +19,13 @@ Production Expo (React Native + TypeScript) app for directional short-form video
 
 | Item | Value |
 |------|-------|
-| Entitlement | `pro` |
-| Monthly | `virallens_pro_monthly` — $9.99 · 30 analyses / billing period |
-| Annual | `virallens_pro_annual` — $39.99 · 40 analyses / month |
+| Entitlement | `virallens_pro` |
+| Monthly | `monthly` — $9.99 · 30 analyses / billing period |
+| Yearly | `yearly` — maps to plan `annual` · 40 analyses / month |
+| Lifetime | `lifetime` — maps to plan `annual` quota (no schema change) |
 | Trial | 3-day intro · ≤3 completed analyses |
 | Unlock rule | RevenueCat **webhook** sets `subscriptions.entitlement_active`. Client cannot unlock Pro by flipping local state. |
+| Paywall | Prefer `RevenueCatUI.presentPaywall` (see `docs/revenuecat-expo.md`) |
 
 Never advertise unlimited. Always show remaining analyses.
 
@@ -114,11 +116,15 @@ Service role key is injected automatically in Edge Functions.
 
 ## 3. RevenueCat
 
-1. Create entitlement `pro`.
-2. Create products `virallens_pro_monthly` and `virallens_pro_annual` with a 3-day intro trial on annual (or both, per store rules).
-3. Attach products to an Offering.
-4. Webhook → `https://YOUR_PROJECT.supabase.co/functions/v1/rc-webhook` with Authorization bearer = `REVENUECAT_WEBHOOK_SECRET`.
-5. Identify users with Supabase user UUID (`Purchases.logIn`).
+Full Expo checklist: **[docs/revenuecat-expo.md](docs/revenuecat-expo.md)**
+
+1. Create entitlement `virallens_pro`.
+2. Create products `monthly`, `yearly`, `lifetime` (3-day intro trial on yearly where offered).
+3. Attach all products to `virallens_pro` and to the current Offering.
+4. Design a Paywall + enable Customer Center in the dashboard.
+5. Webhook → `https://YOUR_PROJECT.supabase.co/functions/v1/rc-webhook` with Authorization bearer = `REVENUECAT_WEBHOOK_SECRET`.
+6. Identify users with Supabase user UUID (`Purchases.logIn`).
+7. Use Test Store `test_…` keys locally; `appl_` / `goog_` for production.
 
 ## 4. EAS / TestFlight
 
