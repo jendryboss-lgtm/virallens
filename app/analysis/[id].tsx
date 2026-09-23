@@ -10,14 +10,15 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { DisclaimerBanner, EmptyState } from '@/components/ui';
+import { Button, DisclaimerBanner, EmptyState, ProgressBar } from '@/components/ui';
 import { ScoreRing } from '@/components/analysis/ScoreRing';
 import { ScoreBreakdownList } from '@/components/analysis/ScoreBreakdownList';
 import { ImprovementCard } from '@/components/analysis/ImprovementCard';
-import { fetchAnalysis, deleteAnalysis } from '@/features/upload/api';
+import { fetchAnalysis, deleteAnalysis, cancelAnalysis } from '@/features/upload/api';
 import { parseAnalysisResult } from '@/lib/analysisSchema';
 import { formatRange } from '@/lib/scoring';
 import { isConfigured } from '@/lib/env';
+import { analysisStageProgress } from '@/lib/geminiHelpers';
 import { colors, radius, spacing, typography } from '@/theme';
 
 type Tab = 'analytics' | 'improvements' | 'revisions';
@@ -50,18 +51,22 @@ export default function AnalysisDetailScreen() {
   }, [rawResult]);
 
   async function onDelete() {
-    Alert.alert('Delete analysis?', 'This removes the result and any stored video.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteAnalysis(id!);
-          await qc.invalidateQueries({ queryKey: ['analyses'] });
-          router.back();
+    Alert.alert(
+      'Delete this analysis?',
+      'Confirm you own this content. Deleting removes the result and any remaining stored video from ViralLens.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'I own this — delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteAnalysis(id!);
+            await qc.invalidateQueries({ queryKey: ['analyses'] });
+            router.back();
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   if (query.isLoading) {
@@ -77,14 +82,34 @@ export default function AnalysisDetailScreen() {
   }
 
   if (query.data.status !== 'completed' || !result) {
+    const stage = analysisStageProgress(query.data.status);
+    const failed = query.data.status === 'failed' || query.data.status === 'expired';
+    const cancellable = ['pending_upload', 'uploaded', 'queued', 'processing'].includes(
+      query.data.status,
+    );
     return (
       <View style={styles.center}>
-        <Stack.Screen options={{ title: 'Processing' }} />
-        <Text style={styles.status}>{query.data.status.replace('_', ' ')}</Text>
+        <Stack.Screen options={{ title: failed ? 'Failed' : 'Processing' }} />
+        <Text style={styles.status}>{stage.label}</Text>
+        <View style={{ width: '80%', marginTop: 16 }}>
+          <ProgressBar value={stage.percent} color={failed ? colors.danger : colors.accent} />
+        </View>
         <Text style={styles.sub}>
           {query.data.error_message ?? 'Hang tight — analysis updates in realtime.'}
         </Text>
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
+        {!failed ? <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} /> : null}
+        {cancellable ? (
+          <Button
+            title="Cancel analysis"
+            variant="ghost"
+            style={{ marginTop: 24 }}
+            onPress={async () => {
+              await cancelAnalysis(id!);
+              await qc.invalidateQueries({ queryKey: ['analyses'] });
+              router.back();
+            }}
+          />
+        ) : null}
       </View>
     );
   }

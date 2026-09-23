@@ -31,6 +31,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="analysis/[id]" options={{ headerShown: true, title: 'Analysis', headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text }} />
             <Stack.Screen name="analysis/compare" options={{ headerShown: true, title: 'Compare', headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text }} />
+            <Stack.Screen name="help/index" options={{ headerShown: true, title: 'Help', headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text }} />
           </Stack>
         </AuthProvider>
       </QueryClientProvider>
