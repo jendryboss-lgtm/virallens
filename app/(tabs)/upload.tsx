@@ -34,7 +34,6 @@ function VideoPreview({ uri }: { uri: string }) {
       style={styles.video}
       nativeControls
       contentFit="contain"
-      allowsFullscreen
     />
   );
 }
@@ -185,12 +184,22 @@ export default function UploadScreen() {
 
   return (
     <Screen scroll>
-      <Text style={styles.title}>Analyze a short</Text>
+      <Text style={styles.title}>Check an unposted draft</Text>
       <Text style={styles.sub}>
-        MP4/MOV/WebM · max 90s · max 100MB. Remaining this period: {analysesRemaining}
+        Pick a short from Camera Roll before you post. MP4/MOV/WebM · max 90s · max 100MB.
+        Remaining this period: {analysesRemaining}
       </Text>
 
-      <Button title="Choose video" variant="secondary" onPress={pick} disabled={inFlight} />
+      <Button title="Choose from Camera Roll" variant="secondary" onPress={pick} disabled={inFlight} />
+      {!serverEntitled ? (
+        <Button
+          title="Preview sample results"
+          variant="ghost"
+          onPress={() => router.push('/analysis/demo')}
+          style={{ marginTop: spacing.md }}
+          disabled={inFlight}
+        />
+      ) : null}
 
       {video ? (
         <Card style={styles.preview}>

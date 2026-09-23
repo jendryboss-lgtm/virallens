@@ -29,9 +29,9 @@ export default function HistoryScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <EmptyState
-              title="No analyses yet"
-              description="Upload a short to see results here."
-              actionLabel="Analyze"
+              title="No drafts checked yet"
+              description="Check a draft from Camera Roll before you post — results will show up here."
+              actionLabel="Check a draft"
               onAction={() => router.push('/(tabs)/upload')}
             />
           }

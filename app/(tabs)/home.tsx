@@ -16,7 +16,7 @@ export default function HomeScreen() {
       <Text style={styles.hello}>
         Hey{profile?.display_name ? `, ${profile.display_name}` : ''}
       </Text>
-      <Text style={styles.title}>Ready to analyze a short?</Text>
+      <Text style={styles.title}>Check a draft before you post</Text>
 
       <Card style={styles.quota}>
         <Text style={styles.quotaLabel}>Plan</Text>
@@ -35,12 +35,21 @@ export default function HomeScreen() {
         ) : null}
       </Card>
 
-      <Button title="Upload a short" onPress={() => router.push('/(tabs)/upload')} />
+      <Button
+        title="Check a draft before you post"
+        onPress={() => router.push('/(tabs)/upload')}
+      />
       <Button
         title="View history"
         variant="secondary"
         onPress={() => router.push('/(tabs)/history')}
         style={{ marginTop: spacing.md }}
+      />
+      <Button
+        title="Preview sample results"
+        variant="ghost"
+        onPress={() => router.push('/analysis/demo')}
+        style={{ marginTop: spacing.sm }}
       />
 
       <View style={{ height: spacing.xl }} />
