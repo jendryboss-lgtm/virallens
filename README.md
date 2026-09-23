@@ -120,12 +120,17 @@ Service role key is injected automatically in Edge Functions.
 4. Webhook → `https://YOUR_PROJECT.supabase.co/functions/v1/rc-webhook` with Authorization bearer = `REVENUECAT_WEBHOOK_SECRET`.
 5. Identify users with Supabase user UUID (`Purchases.logIn`).
 
-## 4. EAS
+## 4. EAS / TestFlight
+
+Full steps: **[docs/DEPLOY.md](docs/DEPLOY.md)** · env checklist: **[scripts/check-env.md](scripts/check-env.md)** · store copy: **[docs/STORE_LISTING.md](docs/STORE_LISTING.md)**
 
 1. `npm i -g eas-cli && eas login`
 2. Replace `extra.eas.projectId` in `app.json`.
-3. `eas build --profile preview` / `production`
-4. `eas submit` for TestFlight / Play internal testing.
+3. Profiles in `eas.json`: `development`, `preview`, `production`.
+4. `eas build --profile preview` / `production`
+5. `eas submit --profile production` for TestFlight / Play internal testing.
+
+`process-analysis` uses the **Gemini Files API** (upload → ACTIVE → generateContent → delete) so large videos are not base64-inlined.
 
 ## Scripts
 

@@ -114,3 +114,16 @@ export function subscribeAnalysis(
     getSupabaseUntyped().removeChannel(channel);
   };
 }
+
+export async function cancelAnalysis(id: string): Promise<void> {
+  const sb = getSupabaseUntyped();
+  await sb
+    .from('analyses')
+    .update({
+      status: 'failed',
+      error_message: 'Cancelled by user',
+    })
+    .eq('id', id)
+    .in('status', ['pending_upload', 'uploaded', 'queued', 'processing']);
+  await sb.from('analyses').delete().eq('id', id);
+}

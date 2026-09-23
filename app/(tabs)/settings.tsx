@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Chip, Screen, TextField } from '@/components/ui';
 import { useAuthStore, useBillingStore } from '@/store';
@@ -17,6 +17,9 @@ import { env } from '@/lib/env';
 import { colors, spacing, typography } from '@/theme';
 import type { ExperienceLevel, GrowthGoal, NichePref, PlatformPref } from '@/types/database';
 
+const MANAGE_SUB_URL_IOS = 'https://apps.apple.com/account/subscriptions';
+const MANAGE_SUB_URL_ANDROID = 'https://play.google.com/store/account/subscriptions';
+
 export default function SettingsScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -31,6 +34,7 @@ export default function SettingsScreen() {
   const [niche, setNiche] = useState<NichePref | null>(profile?.niche ?? null);
   const [experience, setExperience] = useState<ExperienceLevel | null>(profile?.experience ?? null);
   const [goal, setGoal] = useState<GrowthGoal | null>(profile?.growth_goal ?? null);
+  const [aiConsent, setAiConsent] = useState(Boolean(profile?.ai_consent));
   const [saving, setSaving] = useState(false);
 
   async function savePrefs() {
@@ -43,6 +47,7 @@ export default function SettingsScreen() {
         niche,
         experience,
         growth_goal: goal,
+        ai_consent: aiConsent,
       });
       setProfile(updated);
       Alert.alert('Saved', 'Preferences updated.');
@@ -68,6 +73,13 @@ export default function SettingsScreen() {
     }
   }
 
+  function onManageSubscription() {
+    const url = Platform.OS === 'ios' ? MANAGE_SUB_URL_IOS : MANAGE_SUB_URL_ANDROID;
+    Linking.openURL(url).catch(() => {
+      router.push('/(paywall)/index');
+    });
+  }
+
   async function onSignOut() {
     await signOut();
     resetAuth();
@@ -77,12 +89,12 @@ export default function SettingsScreen() {
 
   function onDeleteAccount() {
     Alert.alert(
-      'Delete account?',
-      'This permanently deletes your account, analyses, and uploaded videos.',
+      'Delete all data?',
+      'Confirm you own this account. This permanently deletes your ViralLens account, analyses, preferences, and any remaining uploaded videos.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'I own this — delete everything',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -107,10 +119,11 @@ export default function SettingsScreen() {
       <Text style={styles.body}>
         {planLabel(plan)} · {serverEntitled ? `${analysesRemaining} analyses left` : 'Not entitled'}
       </Text>
-      <Button title="Manage / Upgrade" variant="secondary" onPress={() => router.push('/(paywall)/index')} />
+      <Button title="Upgrade / plans" variant="secondary" onPress={() => router.push('/(paywall)/index')} />
+      <Button title="Manage subscription" variant="ghost" onPress={onManageSubscription} />
       <Button title="Restore purchases" variant="ghost" onPress={onRestore} />
 
-      <Text style={styles.section}>Profile</Text>
+      <Text style={styles.section}>Profile preferences</Text>
       <TextField label="Display name" value={displayName} onChangeText={setDisplayName} />
 
       <Text style={styles.label}>Platform</Text>
@@ -137,18 +150,27 @@ export default function SettingsScreen() {
           <Chip key={o.value} label={o.label} selected={goal === o.value} onPress={() => setGoal(o.value)} />
         ))}
       </View>
+
+      <Text style={styles.section}>Privacy controls</Text>
+      <Chip
+        label={aiConsent ? 'AI consent: granted' : 'AI consent: required to analyze'}
+        selected={aiConsent}
+        onPress={() => setAiConsent((c) => !c)}
+      />
+      <Text style={styles.consent}>
+        ViralLens only analyzes videos you upload after you grant AI consent. You can revoke it here;
+        new analyses will be blocked until consent is granted again.
+      </Text>
       <Button title="Save preferences" loading={saving} onPress={savePrefs} />
 
-      <Text style={styles.section}>Legal & privacy</Text>
+      <Text style={styles.section}>Help & legal</Text>
+      <Button title="Help & support" variant="secondary" onPress={() => router.push('/help/index')} />
       <Button title="Privacy policy" variant="ghost" onPress={() => Linking.openURL(env.privacyUrl)} />
       <Button title="Terms of use" variant="ghost" onPress={() => Linking.openURL(env.termsUrl)} />
-      <Text style={styles.consent}>
-        AI consent: {profile?.ai_consent ? 'Granted' : 'Not granted'} — required to analyze uploads.
-      </Text>
 
       <Text style={styles.section}>Account</Text>
       <Button title="Sign out" variant="secondary" onPress={onSignOut} />
-      <Button title="Delete account & data" variant="danger" onPress={onDeleteAccount} />
+      <Button title="Delete account & all data" variant="danger" onPress={onDeleteAccount} />
     </Screen>
   );
 }
@@ -159,5 +181,5 @@ const styles = StyleSheet.create({
   body: { ...typography.bodySecondary, marginBottom: spacing.md },
   label: { ...typography.label, marginTop: spacing.md, marginBottom: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap' },
-  consent: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm },
+  consent: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm, marginBottom: spacing.md },
 });

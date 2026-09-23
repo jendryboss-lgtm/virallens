@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import type { PurchasesOfferings, PurchasesPackage } from 'react-native-purchases';
 import { Button, Card, DisclaimerBanner } from '@/components/ui';
 import {
@@ -108,6 +108,7 @@ export function PaywallPanel({ onSuccess }: Props) {
           <Text style={styles.per}> / month</Text>
         </Text>
         <Text style={styles.quota}>{QUOTAS.monthly} analyses per billing period</Text>
+        <Text style={styles.trial}>3-day intro trial available where offered by the store</Text>
         <Button
           title="Start monthly"
           loading={loading === 'monthly'}
@@ -149,6 +150,19 @@ export function PaywallPanel({ onSuccess }: Props) {
         loading={loading === 'restore'}
         disabled={!!loading}
         onPress={onRestore}
+      />
+
+
+      <Button
+        title="Manage subscription"
+        variant="ghost"
+        onPress={() =>
+          Linking.openURL(
+            Platform.OS === 'ios'
+              ? 'https://apps.apple.com/account/subscriptions'
+              : 'https://play.google.com/store/account/subscriptions',
+          )
+        }
       />
 
       <View style={styles.legal}>

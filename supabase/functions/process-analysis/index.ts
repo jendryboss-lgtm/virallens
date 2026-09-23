@@ -3,8 +3,18 @@ import { adminClient } from '../_shared/supabase.ts';
 import { AnalysisResultSchema, DISCLAIMER } from '../_shared/analysisSchema.ts';
 import { deleteAnalysisVideo } from '../_shared/videoExpiry.ts';
 import { quotaForPlan, type PlanType } from '../_shared/quotas.ts';
+import {
+  uploadGeminiFile,
+  waitForGeminiFileActive,
+  deleteGeminiFile,
+  generateContentWithFile,
+  GeminiModerationError,
+  GeminiTimeoutError,
+} from '../_shared/geminiFiles.ts';
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const MAX_JSON_RETRIES = 2;
+const OVERALL_TIMEOUT_MS = 240_000;
+const FILE_ACTIVE_TIMEOUT_MS = 120_000;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,9 +23,11 @@ Deno.serve(async (req) => {
 
   const admin = adminClient();
   let analysisId: string | null = null;
+  let storagePath: string | null = null;
+  let geminiFileName: string | null = null;
+  const geminiKey = Deno.env.get('GEMINI_API_KEY') ?? '';
 
   try {
-    // Service-role only
     const auth = req.headers.get('Authorization') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     if (!auth.includes(serviceKey)) {
@@ -33,120 +45,194 @@ Deno.serve(async (req) => {
       .single();
     if (error || !analysis) return jsonResponse({ error: 'Not found' }, 404);
 
-    await admin.from('analyses').update({ status: 'processing', error_message: null }).eq('id', analysisId);
-
-    const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!geminiKey) {
-      throw new Error('GEMINI_API_KEY not configured');
+    // Idempotent: already completed — do not re-charge usage
+    if (analysis.status === 'completed' && analysis.result) {
+      return jsonResponse({ ok: true, analysisId, idempotent: true });
     }
 
-    if (!analysis.storage_path) throw new Error('Missing storage path');
-
-    const { data: fileBlob, error: dlError } = await admin.storage
-      .from('videos')
-      .download(analysis.storage_path);
-    if (dlError || !fileBlob) throw dlError ?? new Error('Video download failed');
-
-    const bytes = new Uint8Array(await fileBlob.arrayBuffer());
-    const base64 = btoa(String.fromCharCode(...chunkBytes(bytes)));
-
-    const profile = analysis.profiles ?? {};
-    const prompt = buildPrompt({
-      platform: profile.platform ?? analysis.platform_hint,
-      niche: profile.niche,
-      experience: profile.experience,
-      growthGoal: profile.growth_goal,
-      durationSeconds: analysis.duration_seconds,
-    });
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: analysis.mime_type ?? 'video/mp4',
-                    data: base64,
-                  },
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.4,
-            responseMimeType: 'application/json',
-          },
-        }),
-      },
-    );
-
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      throw new Error(`Gemini error ${geminiRes.status}: ${errText.slice(0, 500)}`);
+    // Soft-cancel / terminal states
+    if (analysis.status === 'failed' || analysis.status === 'expired') {
+      return jsonResponse({ ok: false, analysisId, skipped: analysis.status });
     }
 
-    const geminiJson = await geminiRes.json();
-    const text =
-      geminiJson?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ??
-      '';
+    storagePath = analysis.storage_path;
 
-    let raw: unknown;
-    try {
-      raw = JSON.parse(text);
-    } catch {
-      throw new Error('Gemini returned non-JSON output');
-    }
-
-    const parsed = AnalysisResultSchema.parse(raw);
-    parsed.disclaimer = DISCLAIMER;
-    // Broaden ranges slightly to avoid fake precision
-    parsed.predictions = broadenPredictions(parsed.predictions);
-
+    // Claim job (idempotent if already processing — continue)
     await admin
       .from('analyses')
-      .update({
-        status: 'completed',
-        result: parsed,
-        completed_at: new Date().toISOString(),
-        error_message: null,
-      })
-      .eq('id', analysisId);
+      .update({ status: 'processing', error_message: null })
+      .eq('id', analysisId)
+      .in('status', ['queued', 'uploaded', 'processing']);
 
-    // Increment usage for completed analysis
-    await incrementUsage(admin, analysis.user_id);
+    if (!geminiKey) throw new Error('GEMINI_API_KEY not configured');
+    if (!analysis.storage_path) throw new Error('Missing storage path');
 
-    // Delete raw video after successful analysis
-    await deleteAnalysisVideo(admin, analysisId, analysis.storage_path);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), OVERALL_TIMEOUT_MS);
 
-    return jsonResponse({ ok: true, analysisId });
+    try {
+      const { data: fileBlob, error: dlError } = await admin.storage
+        .from('videos')
+        .download(analysis.storage_path);
+      if (dlError || !fileBlob) throw dlError ?? new Error('Video download failed');
+
+      const bytes = new Uint8Array(await fileBlob.arrayBuffer());
+      const mimeType = analysis.mime_type ?? 'video/mp4';
+
+      const uploaded = await uploadGeminiFile({
+        apiKey: geminiKey,
+        bytes,
+        mimeType,
+        displayName: `virallens-${analysisId}`,
+        signal: controller.signal,
+      });
+      geminiFileName = uploaded.name;
+
+      const active = await waitForGeminiFileActive({
+        apiKey: geminiKey,
+        fileName: uploaded.name,
+        timeoutMs: FILE_ACTIVE_TIMEOUT_MS,
+        signal: controller.signal,
+      });
+
+      const profile = analysis.profiles ?? {};
+      const prompt = buildPrompt({
+        platform: profile.platform ?? analysis.platform_hint,
+        niche: profile.niche,
+        experience: profile.experience,
+        growthGoal: profile.growth_goal,
+        durationSeconds: analysis.duration_seconds,
+      });
+
+      let parsed: ReturnType<typeof AnalysisResultSchema.parse> | null = null;
+      let lastError: Error | null = null;
+
+      for (let attempt = 0; attempt <= MAX_JSON_RETRIES; attempt++) {
+        const gen = await generateContentWithFile({
+          apiKey: geminiKey,
+          fileUri: active.uri,
+          mimeType: active.mimeType || mimeType,
+          prompt:
+            attempt === 0
+              ? prompt
+              : `${prompt}\n\nIMPORTANT: Previous reply was invalid JSON. Return ONLY valid JSON matching the schema.`,
+          signal: controller.signal,
+        });
+
+        if (gen.blocked) {
+          throw new GeminiModerationError(
+            `Content blocked by model safety filters${gen.blockReason ? `: ${gen.blockReason}` : ''}`,
+          );
+        }
+
+        try {
+          const raw = extractJson(gen.text);
+          parsed = AnalysisResultSchema.parse(raw);
+          break;
+        } catch (e) {
+          lastError = e instanceof Error ? e : new Error(String(e));
+          if (attempt >= MAX_JSON_RETRIES) break;
+        }
+      }
+
+      if (!parsed) {
+        throw lastError ?? new Error('Gemini returned non-JSON output');
+      }
+
+      parsed.disclaimer = DISCLAIMER;
+      parsed.predictions = broadenPredictions(parsed.predictions);
+
+      // Idempotent complete: only transition from processing/queued
+      const { data: updated, error: upErr } = await admin
+        .from('analyses')
+        .update({
+          status: 'completed',
+          result: parsed,
+          completed_at: new Date().toISOString(),
+          error_message: null,
+        })
+        .eq('id', analysisId)
+        .in('status', ['processing', 'queued', 'uploaded'])
+        .select('id')
+        .maybeSingle();
+
+      if (upErr) throw upErr;
+
+      if (updated) {
+        await incrementUsage(admin, analysis.user_id);
+      }
+
+      await deleteAnalysisVideo(admin, analysisId, analysis.storage_path);
+      storagePath = null;
+
+      return jsonResponse({ ok: true, analysisId });
+    } finally {
+      clearTimeout(timeout);
+      if (geminiFileName && geminiKey) {
+        await deleteGeminiFile(geminiKey, geminiFileName);
+      }
+    }
   } catch (e) {
     console.error('process-analysis', e);
+    const message =
+      e instanceof GeminiModerationError
+        ? e.message
+        : e instanceof GeminiTimeoutError || (e instanceof DOMException && e.name === 'AbortError')
+          ? 'Analysis timed out'
+          : e instanceof Error
+            ? e.message
+            : 'Analysis failed';
+
     if (analysisId) {
+      // Idempotent fail — do not overwrite completed
       await admin
         .from('analyses')
         .update({
           status: 'failed',
-          error_message: e instanceof Error ? e.message : 'Analysis failed',
+          error_message: message,
         })
-        .eq('id', analysisId);
+        .eq('id', analysisId)
+        .neq('status', 'completed');
+
+      // Delete raw video after failure per policy
+      if (storagePath) {
+        await deleteAnalysisVideo(admin, analysisId, storagePath);
+      } else {
+        const { data: row } = await admin
+          .from('analyses')
+          .select('storage_path')
+          .eq('id', analysisId)
+          .maybeSingle();
+        if (row?.storage_path) {
+          await deleteAnalysisVideo(admin, analysisId, row.storage_path);
+        }
+      }
     }
-    return jsonResponse({ error: e instanceof Error ? e.message : 'Server error' }, 500);
+
+    if (geminiFileName && geminiKey) {
+      await deleteGeminiFile(geminiKey, geminiFileName);
+    }
+
+    const status =
+      e instanceof GeminiModerationError ? 422 : e instanceof GeminiTimeoutError ? 504 : 500;
+    return jsonResponse({ error: message }, status);
   }
 });
 
-function chunkBytes(bytes: Uint8Array, chunkSize = 0x8000): string {
-  let result = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    result += String.fromCharCode(...chunk);
+function extractJson(text: string): unknown {
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence?.[1]) return JSON.parse(fence[1].trim());
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    }
+    throw new Error('Gemini returned non-JSON output');
   }
-  return result;
 }
 
 function buildPrompt(ctx: {
