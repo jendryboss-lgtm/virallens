@@ -85,3 +85,18 @@ Custom monthly / yearly / lifetime cards remain as a fallback if the UI paywall 
 - `src/lib/constants.ts` — `PRODUCT_IDS`, `ENTITLEMENT_ID`, `QUOTAS`  
 - `src/features/billing/PaywallPanel.tsx` — primary UI paywall + fallback cards  
 - `supabase/functions/rc-webhook` + `_shared/quotas.ts` — server entitlement
+
+## EAS rebuild (required for Paywalls UI)
+
+```sh
+npx expo install expo-dev-client   # already in package.json
+eas login
+eas init                           # sets extra.eas.projectId in app.json
+eas build --platform ios --profile development
+# or Android:
+eas build --platform android --profile development
+```
+
+`app.json` still has `extra.eas.projectId: REPLACE_WITH_EAS_PROJECT_ID` until `eas init` runs.
+Test Store purchases work after a native rebuild; Expo Go alone is Preview API Mode only.
+
