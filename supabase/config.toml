@@ -1,0 +1,33 @@
+# Minimal Supabase project config for local/CLI use
+project_id = "virallens"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[functions.create-upload]
+verify_jwt = true
+
+[functions.enqueue-analysis]
+verify_jwt = true
+
+[functions.process-analysis]
+verify_jwt = false
+
+[functions.rc-webhook]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = true
