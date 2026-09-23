@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { PurchasesOfferings, PurchasesPackage } from 'react-native-purchases';
 import { Button, Card, DisclaimerBanner } from '@/components/ui';
 import {
@@ -12,7 +13,6 @@ import {
   isRevenueCatConfigured,
 } from '@/lib/revenuecat';
 import { QUOTAS } from '@/lib/constants';
-import { env } from '@/lib/env';
 import { colors, spacing, typography } from '@/theme';
 import { refreshBillingState } from './sync';
 import { useAuthStore } from '@/store';
@@ -22,6 +22,7 @@ interface Props {
 }
 
 export function PaywallPanel({ onSuccess }: Props) {
+  const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
   const [loading, setLoading] = useState<'monthly' | 'annual' | 'restore' | null>(null);
@@ -166,11 +167,11 @@ export function PaywallPanel({ onSuccess }: Props) {
       />
 
       <View style={styles.legal}>
-        <Text style={styles.link} onPress={() => Linking.openURL(env.termsUrl)}>
+        <Text style={styles.link} onPress={() => router.push('/legal/terms')}>
           Terms
         </Text>
         <Text style={styles.dot}>·</Text>
-        <Text style={styles.link} onPress={() => Linking.openURL(env.privacyUrl)}>
+        <Text style={styles.link} onPress={() => router.push('/legal/privacy')}>
           Privacy
         </Text>
       </View>

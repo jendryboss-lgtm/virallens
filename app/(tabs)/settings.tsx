@@ -13,7 +13,6 @@ import {
   experienceOptions,
   growthGoalOptions,
 } from '@/features/onboarding/prefs';
-import { env } from '@/lib/env';
 import { colors, spacing, typography } from '@/theme';
 import type { ExperienceLevel, GrowthGoal, NichePref, PlatformPref } from '@/types/database';
 
@@ -165,8 +164,8 @@ export default function SettingsScreen() {
 
       <Text style={styles.section}>Help & legal</Text>
       <Button title="Help & support" variant="secondary" onPress={() => router.push('/help/index')} />
-      <Button title="Privacy policy" variant="ghost" onPress={() => Linking.openURL(env.privacyUrl)} />
-      <Button title="Terms of use" variant="ghost" onPress={() => Linking.openURL(env.termsUrl)} />
+      <Button title="Privacy policy" variant="ghost" onPress={() => router.push('/legal/privacy')} />
+      <Button title="Terms of use" variant="ghost" onPress={() => router.push('/legal/terms')} />
 
       <Text style={styles.section}>Account</Text>
       <Button title="Sign out" variant="secondary" onPress={onSignOut} />

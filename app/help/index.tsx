@@ -1,14 +1,14 @@
 import React from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Button, Card, DisclaimerBanner, Screen } from '@/components/ui';
-import { env } from '@/lib/env';
 import { QUOTAS } from '@/lib/constants';
 import { colors, spacing, typography } from '@/theme';
 
 const SUPPORT_EMAIL = 'support@virallens.app';
 
 export default function HelpScreen() {
+  const router = useRouter();
   return (
     <Screen scroll>
       <Stack.Screen
@@ -55,8 +55,8 @@ export default function HelpScreen() {
         title="Email support"
         onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=ViralLens%20support`)}
       />
-      <Button title="Privacy policy" variant="ghost" onPress={() => Linking.openURL(env.privacyUrl)} />
-      <Button title="Terms of use" variant="ghost" onPress={() => Linking.openURL(env.termsUrl)} />
+      <Button title="Privacy policy" variant="ghost" onPress={() => router.push('/legal/privacy')} />
+      <Button title="Terms of use" variant="ghost" onPress={() => router.push('/legal/terms')} />
 
       <View style={{ height: spacing.xl }} />
       <DisclaimerBanner />
