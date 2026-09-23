@@ -26,8 +26,8 @@ export default function HelpScreen() {
           directional scores, improvements, and revision ideas.
         </Text>
         <Text style={styles.body}>
-          Quotas: trial ≤{QUOTAS.trial} completed analyses · monthly {QUOTAS.monthly}/period · annual{' '}
-          {QUOTAS.annual}/month. Remaining counts are always shown in-app.
+          Quotas: trial ≤{QUOTAS.trial} completed analyses · monthly {QUOTAS.monthly}/period · yearly/lifetime{' '}
+          {QUOTAS.annual}/month (entitlement virallens_pro). Remaining counts are always shown in-app.
         </Text>
       </Card>
 

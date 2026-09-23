@@ -48,7 +48,7 @@ export const TERMS_SECTIONS: { heading: string; body: string }[] = [
   {
     heading: 'Plans & quotas',
     body:
-      'Intro trial: up to 3 completed analyses. Monthly Pro: 30 analyses per billing period. Annual Pro: 40 analyses per month. Subscriptions are billed through the App Store or Google Play. Manage or cancel in store subscription settings. Restore purchases after reinstall.',
+      'Intro trial: up to 3 completed analyses. Monthly Pro: 30 analyses per billing period. Yearly and Lifetime Pro: 40 analyses per month (LifetimeCat entitlement virallens_pro). Subscriptions and lifetime unlocks are billed through the App Store or Google Play. Manage or cancel in store subscription settings or Customer Center. Restore purchases after reinstall.',
   },
   {
     heading: 'AI & ownership',

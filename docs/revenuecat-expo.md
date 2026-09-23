@@ -77,7 +77,7 @@ Custom monthly / yearly / lifetime cards remain as a fallback if the UI paywall 
 
 ## Native note
 
-`react-native-purchases-ui` requires a **dev client / EAS native build** (not Expo Go alone for full paywall UI). After adding the package, rebuild with EAS.
+`expo-dev-client` is a dependency. `react-native-purchases-ui` requires a **dev client / EAS native build** (not Expo Go alone for full paywall UI). After adding the package, rebuild with EAS.
 
 ## Related files
 
