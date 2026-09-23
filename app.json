@@ -56,7 +56,8 @@
         {
           "photosPermission": "Allow ViralLens to access your videos for short-form analysis."
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

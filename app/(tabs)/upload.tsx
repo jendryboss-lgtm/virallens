@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRouter } from 'expo-router';
 import { Button, Card, ProgressBar, Screen, DisclaimerBanner } from '@/components/ui';
 import {
@@ -22,6 +22,22 @@ import { colors, spacing, typography } from '@/theme';
 import { isConfigured } from '@/lib/env';
 
 type Phase = 'idle' | 'uploading' | 'queued' | 'processing' | 'done' | 'error' | 'cancelled';
+
+
+function VideoPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+  });
+  return (
+    <VideoView
+      player={player}
+      style={styles.video}
+      nativeControls
+      contentFit="contain"
+      allowsFullscreen
+    />
+  );
+}
 
 export default function UploadScreen() {
   const router = useRouter();
@@ -178,12 +194,7 @@ export default function UploadScreen() {
 
       {video ? (
         <Card style={styles.preview}>
-          <Video
-            source={{ uri: video.uri }}
-            style={styles.video}
-            useNativeControls
-            resizeMode={ResizeMode.CONTAIN}
-          />
+          <VideoPreview uri={video.uri} />
           <Text style={styles.meta}>
             {video.fileName} · {video.durationSeconds.toFixed(1)}s ·{' '}
             {(video.fileSize / (1024 * 1024)).toFixed(1)} MB
