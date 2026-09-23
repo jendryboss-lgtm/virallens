@@ -19,7 +19,7 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "ViralLens needs photo library access to analyze your short-form videos.",
         "NSCameraUsageDescription": "ViralLens needs camera access if you record a short for analysis.",
-        "NSMicrophoneUsageDescription": "ViralLens needs microphone access when recording video."
+        "NSMicrophoneUsageDescription": "ViralLens needs microphone access when recording video.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
