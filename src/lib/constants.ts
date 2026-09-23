@@ -1,9 +1,13 @@
 export const PRODUCT_IDS = {
-  monthly: 'virallens_pro_monthly',
-  annual: 'virallens_pro_annual',
+  monthly: 'monthly',
+  yearly: 'yearly',
+  lifetime: 'lifetime',
 } as const;
 
-export const ENTITLEMENT_ID = 'pro';
+/** Alias for DB/quota PlanKind mapping (yearly product → annual plan). */
+export const PRODUCT_ID_YEARLY = PRODUCT_IDS.yearly;
+
+export const ENTITLEMENT_ID = 'virallens_pro';
 
 export const QUOTAS = {
   trial: 3,

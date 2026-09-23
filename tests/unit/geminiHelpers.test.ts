@@ -62,8 +62,9 @@ describe('gemini File API helpers', () => {
 describe('quota / product alignment', () => {
   it('matches locked monetization contract', () => {
     expect(QUOTAS).toEqual({ trial: 3, monthly: 30, annual: 40 });
-    expect(PRODUCT_IDS.monthly).toBe('virallens_pro_monthly');
-    expect(PRODUCT_IDS.annual).toBe('virallens_pro_annual');
-    expect(ENTITLEMENT_ID).toBe('pro');
+    expect(PRODUCT_IDS.monthly).toBe('monthly');
+    expect(PRODUCT_IDS.yearly).toBe('yearly');
+    expect(PRODUCT_IDS.lifetime).toBe('lifetime');
+    expect(ENTITLEMENT_ID).toBe('virallens_pro');
   });
 });

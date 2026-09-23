@@ -42,3 +42,6 @@ coverage/
 # IDE
 .idea/
 .vscode/
+.env.local
+supabase/.temp
+.secrets.local

@@ -9,7 +9,10 @@ export function resolvePlanKind(opts: {
 }): PlanKind {
   if (!opts.hasPro) return 'none';
   if (opts.isTrialing) return 'trial';
-  if (opts.productId === PRODUCT_IDS.annual) return 'annual';
+  // Yearly store product maps to annual plan/quota in DB.
+  if (opts.productId === PRODUCT_IDS.yearly) return 'annual';
+  // Lifetime maps to annual quota without adding a plan_type enum value.
+  if (opts.productId === PRODUCT_IDS.lifetime) return 'annual';
   if (opts.productId === PRODUCT_IDS.monthly) return 'monthly';
   // Fail closed to monthly quota if product unknown but entitled
   return 'monthly';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { PurchasesOfferings, PurchasesPackage } from 'react-native-purchases';
 import { Button, Card, DisclaimerBanner } from '@/components/ui';
@@ -11,6 +11,10 @@ import {
   hasProEntitlement,
   PRODUCT_IDS,
   isRevenueCatConfigured,
+  presentRevenueCatPaywall,
+  presentCustomerCenter,
+  isUserCancelledError,
+  purchasesErrorMessage,
 } from '@/lib/revenuecat';
 import { QUOTAS } from '@/lib/constants';
 import { colors, spacing, typography } from '@/theme';
@@ -21,12 +25,15 @@ interface Props {
   onSuccess?: () => void;
 }
 
+type LoadKind = 'paywall' | 'monthly' | 'yearly' | 'lifetime' | 'restore' | 'manage' | null;
+
 export function PaywallPanel({ onSuccess }: Props) {
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
-  const [loading, setLoading] = useState<'monthly' | 'annual' | 'restore' | null>(null);
+  const [loading, setLoading] = useState<LoadKind>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uiPaywallFailed, setUiPaywallFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,9 +60,48 @@ export function PaywallPanel({ onSuccess }: Props) {
   }, []);
 
   const monthly = findPackage(offerings, PRODUCT_IDS.monthly);
-  const annual = findPackage(offerings, PRODUCT_IDS.annual);
+  const yearly = findPackage(offerings, PRODUCT_IDS.yearly);
+  const lifetime = findPackage(offerings, PRODUCT_IDS.lifetime);
 
-  async function buy(pkg: PurchasesPackage | null, kind: 'monthly' | 'annual') {
+  async function afterPurchaseSuccess() {
+    if (userId) await refreshBillingState(userId);
+    onSuccess?.();
+  }
+
+  async function openDashboardPaywall() {
+    setLoading('paywall');
+    setError(null);
+    try {
+      const outcome = await presentRevenueCatPaywall();
+      if (outcome.kind === 'purchased' || outcome.kind === 'restored') {
+        if (outcome.customerInfo && !hasProEntitlement(outcome.customerInfo)) {
+          // Webhook is source of truth — still treat as success for UX refresh
+          console.info('[Paywall] RC result without local entitlement yet — waiting for webhook.');
+        }
+        await afterPurchaseSuccess();
+        return;
+      }
+      if (outcome.kind === 'cancelled' || outcome.kind === 'not_presented') {
+        return;
+      }
+      // UI package / paywall unavailable — keep custom cards as fallback
+      setUiPaywallFailed(true);
+      setError(
+        outcome.kind === 'error' || outcome.kind === 'unavailable'
+          ? outcome.message
+          : 'Failed to present paywall',
+      );
+    } catch (e: unknown) {
+      if (!isUserCancelledError(e)) {
+        setUiPaywallFailed(true);
+        setError(purchasesErrorMessage(e, 'Failed to open paywall'));
+      }
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function buy(pkg: PurchasesPackage | null, kind: 'monthly' | 'yearly' | 'lifetime') {
     if (!pkg) {
       Alert.alert('Unavailable', 'This product is not available in the current offering.');
       return;
@@ -67,13 +113,10 @@ export function PaywallPanel({ onSuccess }: Props) {
       if (!hasProEntitlement(info)) {
         throw new Error('Entitlement not active after purchase.');
       }
-      if (userId) await refreshBillingState(userId);
-      // Still fail-closed until webhook marks server entitlement — inform user
-      onSuccess?.();
+      await afterPurchaseSuccess();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Purchase failed';
-      if (!/cancelled|canceled/i.test(msg)) {
-        setError(msg);
+      if (!isUserCancelledError(e)) {
+        setError(purchasesErrorMessage(e, 'Purchase failed'));
       }
     } finally {
       setLoading(null);
@@ -88,55 +131,108 @@ export function PaywallPanel({ onSuccess }: Props) {
       if (userId) await refreshBillingState(userId);
       Alert.alert('Restore complete', 'If you have an active Pro subscription, it will sync shortly.');
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Restore failed');
+      setError(purchasesErrorMessage(e, 'Restore failed'));
     } finally {
       setLoading(null);
     }
   }
 
+  async function onManage() {
+    setLoading('manage');
+    try {
+      await presentCustomerCenter();
+    } catch (e: unknown) {
+      setError(purchasesErrorMessage(e, 'Could not open subscription management'));
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  const showFallbackCards = uiPaywallFailed || !isRevenueCatConfigured();
+
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>Unlock ViralLens Pro</Text>
       <Text style={styles.sub}>
-        Start a 3-day intro trial. Analyze shorts with directional scores, improvements, and
-        revision ideas — never marketed as unlimited.
+        Start a 3-day intro trial where offered. Analyze shorts with directional scores,
+        improvements, and revision ideas — never marketed as unlimited.
       </Text>
 
-      <Card style={styles.card}>
-        <Text style={styles.planTitle}>Monthly</Text>
-        <Text style={styles.price}>
-          {monthly?.product.priceString ?? '$9.99'}
-          <Text style={styles.per}> / month</Text>
-        </Text>
-        <Text style={styles.quota}>{QUOTAS.monthly} analyses per billing period</Text>
-        <Text style={styles.trial}>3-day intro trial available where offered by the store</Text>
+      {isRevenueCatConfigured() ? (
         <Button
-          title="Start monthly"
-          loading={loading === 'monthly'}
-          disabled={!!loading}
-          onPress={() => buy(monthly, 'monthly')}
-          style={{ marginTop: spacing.md }}
-        />
-      </Card>
-
-      <Card style={[styles.card, styles.featured]}>
-        <Text style={styles.badge}>Best value</Text>
-        <Text style={styles.planTitle}>Annual</Text>
-        <Text style={styles.price}>
-          {annual?.product.priceString ?? '$39.99'}
-          <Text style={styles.per}> / year</Text>
-        </Text>
-        <Text style={styles.quota}>{QUOTAS.annual} analyses per month</Text>
-        <Text style={styles.trial}>Includes 3-day intro trial</Text>
-        <Button
-          title="Start annual with trial"
+          title="View plans"
           variant="accent"
-          loading={loading === 'annual'}
+          loading={loading === 'paywall'}
           disabled={!!loading}
-          onPress={() => buy(annual, 'annual')}
-          style={{ marginTop: spacing.md }}
+          onPress={openDashboardPaywall}
         />
-      </Card>
+      ) : null}
+
+      {showFallbackCards ? (
+        <>
+          <Text style={styles.fallbackNote}>
+            {uiPaywallFailed
+              ? 'Dashboard paywall unavailable — choose a plan below.'
+              : 'Choose a plan:'}
+          </Text>
+
+          <Card style={styles.card}>
+            <Text style={styles.planTitle}>Monthly</Text>
+            <Text style={styles.price}>
+              {monthly?.product.priceString ?? '$9.99'}
+              <Text style={styles.per}> / month</Text>
+            </Text>
+            <Text style={styles.quota}>{QUOTAS.monthly} analyses per billing period</Text>
+            <Text style={styles.trial}>3-day intro trial available where offered by the store</Text>
+            <Button
+              title="Start monthly"
+              loading={loading === 'monthly'}
+              disabled={!!loading}
+              onPress={() => buy(monthly, 'monthly')}
+              style={{ marginTop: spacing.md }}
+            />
+          </Card>
+
+          <Card style={[styles.card, styles.featured]}>
+            <Text style={styles.badge}>Best value</Text>
+            <Text style={styles.planTitle}>Yearly</Text>
+            <Text style={styles.price}>
+              {yearly?.product.priceString ?? '$39.99'}
+              <Text style={styles.per}> / year</Text>
+            </Text>
+            <Text style={styles.quota}>{QUOTAS.annual} analyses per month</Text>
+            <Text style={styles.trial}>Includes 3-day intro trial where offered</Text>
+            <Button
+              title="Start yearly with trial"
+              variant="accent"
+              loading={loading === 'yearly'}
+              disabled={!!loading}
+              onPress={() => buy(yearly, 'yearly')}
+              style={{ marginTop: spacing.md }}
+            />
+          </Card>
+
+          <Card style={styles.card}>
+            <Text style={styles.planTitle}>Lifetime</Text>
+            <Text style={styles.price}>{lifetime?.product.priceString ?? 'One-time'}</Text>
+            <Text style={styles.quota}>
+              {QUOTAS.annual} analyses per month (lifetime access)
+            </Text>
+            <Button
+              title="Buy lifetime"
+              loading={loading === 'lifetime'}
+              disabled={!!loading}
+              onPress={() => buy(lifetime, 'lifetime')}
+              style={{ marginTop: spacing.md }}
+            />
+          </Card>
+        </>
+      ) : (
+        <Text style={styles.fallbackHint}>
+          Or use Restore / Manage below. Custom plan cards appear if the RevenueCat paywall
+          cannot open.
+        </Text>
+      )}
 
       <Text style={styles.trialNote}>
         Trial quota: up to {QUOTAS.trial} completed analyses. Remaining counts are always shown in
@@ -153,17 +249,12 @@ export function PaywallPanel({ onSuccess }: Props) {
         onPress={onRestore}
       />
 
-
       <Button
         title="Manage subscription"
         variant="ghost"
-        onPress={() =>
-          Linking.openURL(
-            Platform.OS === 'ios'
-              ? 'https://apps.apple.com/account/subscriptions'
-              : 'https://play.google.com/store/account/subscriptions',
-          )
-        }
+        loading={loading === 'manage'}
+        disabled={!!loading}
+        onPress={onManage}
       />
 
       <View style={styles.legal}>
@@ -185,6 +276,8 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.lg },
   title: { ...typography.title },
   sub: { ...typography.bodySecondary },
+  fallbackNote: { ...typography.subtitle },
+  fallbackHint: { ...typography.caption, color: colors.textMuted },
   card: { gap: spacing.xs },
   featured: { borderColor: colors.accent },
   badge: {

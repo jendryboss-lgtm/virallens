@@ -61,9 +61,11 @@ describe('quotas', () => {
 
   it('resolves plan from RC-ish signals', () => {
     expect(
-      resolvePlanKind({ hasPro: true, isTrialing: true, productId: 'virallens_pro_annual' }),
+      resolvePlanKind({ hasPro: true, isTrialing: true, productId: 'yearly' }),
     ).toBe('trial');
-    expect(resolvePlanKind({ hasPro: true, productId: 'virallens_pro_monthly' })).toBe('monthly');
+    expect(resolvePlanKind({ hasPro: true, productId: 'monthly' })).toBe('monthly');
+    expect(resolvePlanKind({ hasPro: true, productId: 'yearly' })).toBe('annual');
+    expect(resolvePlanKind({ hasPro: true, productId: 'lifetime' })).toBe('annual');
     expect(resolvePlanKind({ hasPro: false })).toBe('none');
   });
 });
