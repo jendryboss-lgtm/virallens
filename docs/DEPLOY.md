@@ -100,6 +100,17 @@ Profiles: `development` (dev client), `preview` (internal), `production` (store 
 
 ## 5. Build & TestFlight
 
+### Standalone iOS Simulator demo build (no Metro)
+
+`preview-sim` = internal distribution, iOS Simulator, **Release** config, JS bundled into the
+app. Uses the EAS `development` environment variables (Supabase URL/anon key, RevenueCat key).
+
+```bash
+eas build --platform ios --profile preview-sim --non-interactive
+# then: tar xzf <artifact>.tar.gz && xcrun simctl install booted ViralLens.app
+#       xcrun simctl launch booted com.virallens.app
+```
+
 ```bash
 # iOS internal / TestFlight candidate
 eas build --platform ios --profile preview
