@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRouter } from 'expo-router';
 import { Button, Card, ProgressBar, Screen, DisclaimerBanner } from '@/components/ui';
 import {
@@ -14,7 +14,9 @@ import {
   cancelAnalysis,
 } from '@/features/upload/api';
 import { useAuthStore, useBillingStore } from '@/store';
-import { canStartAnalysis } from '@/lib/quotas';
+import { canAnalyze } from '@/lib/quotas';
+import { FREE_ANALYSES_LIMIT } from '@/lib/constants';
+import { isPaymentRequiredError } from '@/lib/supabase';
 import { analysisStageProgress } from '@/lib/geminiHelpers';
 import { refreshBillingState } from '@/features/billing/sync';
 import type { Analysis } from '@/types/database';
@@ -23,10 +25,26 @@ import { isConfigured } from '@/lib/env';
 
 type Phase = 'idle' | 'uploading' | 'queued' | 'processing' | 'done' | 'error' | 'cancelled';
 
+
+function VideoPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+  });
+  return (
+    <VideoView
+      player={player}
+      style={styles.video}
+      nativeControls
+      contentFit="contain"
+    />
+  );
+}
+
 export default function UploadScreen() {
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id);
-  const { plan, analysesUsed, analysesRemaining, serverEntitled } = useBillingStore();
+  const { plan, analysesUsed, analysesRemaining, serverEntitled, freeAnalysesRemaining } =
+    useBillingStore();
   const [video, setVideo] = useState<PickedVideo | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [statusMsg, setStatusMsg] = useState<string>('');
@@ -107,10 +125,14 @@ export default function UploadScreen() {
       Alert.alert('Not configured', 'Set Supabase env vars before uploading.');
       return;
     }
-    if (!serverEntitled || !canStartAnalysis(plan, analysesUsed)) {
+    if (
+      !canAnalyze({ serverEntitled, plan, analysesUsed, freeRemaining: freeAnalysesRemaining })
+    ) {
       Alert.alert(
         'No analyses remaining',
-        `You have ${analysesRemaining} left on your current plan. Upgrade or wait for the next period.`,
+        serverEntitled
+          ? `You have ${analysesRemaining} left on your current plan. Wait for the next period or change plans.`
+          : `You've used your ${FREE_ANALYSES_LIMIT} free analyses. Upgrade to Pro to keep analyzing.`,
       );
       router.push('/(paywall)/index');
       return;
@@ -145,6 +167,11 @@ export default function UploadScreen() {
       if (cancelledRef.current) return;
       setPhase('error');
       setStatusMsg(e instanceof Error ? e.message : 'Upload failed');
+      if (isPaymentRequiredError(e)) {
+        // Server says quota exhausted — resync counts and show the paywall.
+        if (userId) refreshBillingState(userId).catch(() => undefined);
+        router.push('/(paywall)/index');
+      }
     }
   }
 
@@ -169,21 +196,28 @@ export default function UploadScreen() {
 
   return (
     <Screen scroll>
-      <Text style={styles.title}>Analyze a short</Text>
+      <Text style={styles.title}>Check an unposted draft</Text>
       <Text style={styles.sub}>
-        MP4/MOV/WebM · max 90s · max 100MB. Remaining this period: {analysesRemaining}
+        Pick a short from Camera Roll before you post. MP4/MOV/WebM · max 90s · max 100MB.
+        {serverEntitled
+          ? `Remaining this period: ${analysesRemaining}`
+          : `Free analyses left: ${freeAnalysesRemaining} of ${FREE_ANALYSES_LIMIT}`}
       </Text>
 
-      <Button title="Choose video" variant="secondary" onPress={pick} disabled={inFlight} />
+      <Button title="Choose from Camera Roll" variant="secondary" onPress={pick} disabled={inFlight} />
+      {!serverEntitled ? (
+        <Button
+          title="Preview sample results"
+          variant="ghost"
+          onPress={() => router.push('/analysis/demo')}
+          style={{ marginTop: spacing.md }}
+          disabled={inFlight}
+        />
+      ) : null}
 
       {video ? (
         <Card style={styles.preview}>
-          <Video
-            source={{ uri: video.uri }}
-            style={styles.video}
-            useNativeControls
-            resizeMode={ResizeMode.CONTAIN}
-          />
+          <VideoPreview uri={video.uri} />
           <Text style={styles.meta}>
             {video.fileName} · {video.durationSeconds.toFixed(1)}s ·{' '}
             {(video.fileSize / (1024 * 1024)).toFixed(1)} MB

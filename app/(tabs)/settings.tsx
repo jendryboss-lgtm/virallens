@@ -27,7 +27,7 @@ export default function SettingsScreen() {
   const setProfile = useAuthStore((s) => s.setProfile);
   const resetAuth = useAuthStore((s) => s.reset);
   const resetBilling = useBillingStore((s) => s.reset);
-  const { plan, analysesRemaining, serverEntitled } = useBillingStore();
+  const { plan, analysesRemaining, serverEntitled, freeAnalysesRemaining } = useBillingStore();
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [platform, setPlatform] = useState<PlatformPref | null>(profile?.platform ?? null);
@@ -119,7 +119,9 @@ export default function SettingsScreen() {
 
       <Text style={styles.section}>Subscription</Text>
       <Text style={styles.body}>
-        {planLabel(plan)} · {serverEntitled ? `${analysesRemaining} analyses left` : 'Not entitled'}
+        {planLabel(plan)} · {serverEntitled
+          ? `${analysesRemaining} analyses left`
+          : `${freeAnalysesRemaining} free analyses left`}
       </Text>
       <Button title="Upgrade / plans" variant="secondary" onPress={() => router.push('/(paywall)/index')} />
       <Button title="Manage subscription" variant="ghost" onPress={onManageSubscription} />

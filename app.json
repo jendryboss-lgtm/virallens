@@ -19,7 +19,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "ViralLens needs photo library access to analyze your short-form videos.",
         "NSCameraUsageDescription": "ViralLens needs camera access if you record a short for analysis.",
-        "NSMicrophoneUsageDescription": "ViralLens needs microphone access when recording video."
+        "NSMicrophoneUsageDescription": "ViralLens needs microphone access when recording video.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -56,17 +57,18 @@
         {
           "photosPermission": "Allow ViralLens to access your videos for short-form analysis."
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
-      },
-      "router": {}
+        "projectId": "60143b77-e534-4ac0-a4a1-8dbadf61305c"
+      }
     },
-    "owner": "jendryboss-lgtm"
+    "owner": "jendry813"
   }
 }

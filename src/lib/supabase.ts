@@ -30,12 +30,43 @@ export function getSupabaseUntyped(): SupabaseClient {
   return getSupabase() as unknown as SupabaseClient;
 }
 
+/** Edge function error with HTTP status + optional machine-readable code from the body. */
+export class EdgeFunctionError extends Error {
+  status: number | null;
+  code: string | null;
+  constructor(message: string, status: number | null, code: string | null) {
+    super(message);
+    this.name = 'EdgeFunctionError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function isPaymentRequiredError(e: unknown): boolean {
+  return e instanceof EdgeFunctionError && e.status === 402;
+}
+
 export async function invokeFunction<T>(
   name: string,
   body?: Record<string, unknown>,
 ): Promise<T> {
   const supabase = getSupabase();
   const { data, error } = await supabase.functions.invoke(name, { body });
-  if (error) throw error;
+  if (error) {
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      let message = error.message;
+      let code: string | null = null;
+      try {
+        const json = (await ctx.clone().json()) as { error?: string; code?: string };
+        if (json?.error) message = json.error;
+        if (json?.code) code = json.code;
+      } catch {
+        /* non-JSON body */
+      }
+      throw new EdgeFunctionError(message, ctx.status, code);
+    }
+    throw error;
+  }
   return data as T;
 }

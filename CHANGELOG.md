@@ -7,6 +7,8 @@ All notable ViralLens milestones. Dates in America/Phoenix (PT).
 - GitHub Actions CI on PR/push to `main` (`npm ci`, typecheck, lint, test)
 - In-app Privacy Policy and Terms of Use screens (placeholder copy from store listing)
 - Legal links from paywall, Settings, and Help
+- Free tier: 3 lifetime analyses for non-Pro users (server-enforced in `create-upload`, 402 + paywall when used up); app routes free users to Home instead of forcing the paywall
+- `rc-webhook` hardening: ack RevenueCat TEST events, skip unknown/non-UUID users, fail closed without secret, never revoke Pro on unhandled events
 
 ## [0.2.0] — 2026-09-23 — TestFlight-ready
 

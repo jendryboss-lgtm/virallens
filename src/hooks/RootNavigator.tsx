@@ -4,7 +4,7 @@ import { useAuthStore, useBillingStore } from '@/store';
 import { isConfigured } from '@/lib/env';
 
 /**
- * Gate routing: splash → auth → onboarding → paywall (if no server entitlement) → tabs
+ * Gate routing: splash → auth → onboarding → tabs (Pro, or free analyses left) / paywall (free analyses used up)
  */
 export function RootNavigator() {
   const router = useRouter();
@@ -13,6 +13,7 @@ export function RootNavigator() {
   const session = useAuthStore((s) => s.session);
   const profile = useAuthStore((s) => s.profile);
   const serverEntitled = useBillingStore((s) => s.serverEntitled);
+  const freeRemaining = useBillingStore((s) => s.freeAnalysesRemaining);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -37,9 +38,16 @@ export function RootNavigator() {
     }
 
     if (!serverEntitled) {
-      if (!inPaywall && segments[0] !== '(tabs)') {
-        // Allow tabs only after entitlement; force paywall otherwise
-        if (!inPaywall) router.replace('/(paywall)/index');
+      if (freeRemaining > 0) {
+        // Free tier: let users try their free analyses; paywall is reachable on demand.
+        if (inAuth || inOnboarding || segments[0] === 'index') {
+          router.replace('/(tabs)/home');
+        }
+        return;
+      }
+      // Free analyses used up: paywall first (tabs / sample stay reachable via "Not now").
+      if (!inPaywall && segments[0] !== '(tabs)' && segments[0] !== 'analysis') {
+        router.replace('/(paywall)/index');
       }
       return;
     }
@@ -47,7 +55,7 @@ export function RootNavigator() {
     if (inAuth || inOnboarding || inPaywall || segments[0] === 'index') {
       router.replace('/(tabs)/home');
     }
-  }, [hydrated, session, profile, serverEntitled, segments, router]);
+  }, [hydrated, session, profile, serverEntitled, freeRemaining, segments, router]);
 
   return null;
 }

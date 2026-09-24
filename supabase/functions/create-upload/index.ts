@@ -1,6 +1,12 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabase.ts';
-import { quotaForPlan, type PlanType } from '../_shared/quotas.ts';
+import {
+  FREE_ANALYSES_LIMIT,
+  freeAnalysesRemaining,
+  freeAnalysesUsed,
+  quotaForPlan,
+  type PlanType,
+} from '../_shared/quotas.ts';
 
 const ALLOWED_MIME = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
 const MAX_DURATION = 90;
@@ -59,46 +65,61 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!sub?.entitlement_active) {
-      return jsonResponse({ error: 'Pro entitlement required' }, 402);
-    }
+      // Free tier: FREE_ANALYSES_LIMIT analyses per account lifetime, then paywall.
+      const used = await countFreeUsage(admin, user.id);
+      if (freeAnalysesRemaining(used) <= 0) {
+        return jsonResponse(
+          {
+            error: `You've used your ${FREE_ANALYSES_LIMIT} free analyses. Upgrade to Pro to keep analyzing.`,
+            code: 'free_quota_exhausted',
+            freeLimit: FREE_ANALYSES_LIMIT,
+            freeUsed: used,
+          },
+          402,
+        );
+      }
+    } else {
+      const plan = (sub.plan ?? 'none') as PlanType;
+      const quota = quotaForPlan(plan);
+      if (quota <= 0) return jsonResponse({ error: 'No quota for plan' }, 402);
 
-    const plan = (sub.plan ?? 'none') as PlanType;
-    const quota = quotaForPlan(plan);
-    if (quota <= 0) return jsonResponse({ error: 'No quota for plan' }, 402);
+      const now = new Date();
+      const periodStart = sub.current_period_start
+        ? new Date(sub.current_period_start)
+        : new Date(now.getFullYear(), now.getMonth(), 1);
+      const periodEnd = sub.current_period_end
+        ? new Date(sub.current_period_end)
+        : new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    const now = new Date();
-    const periodStart = sub.current_period_start
-      ? new Date(sub.current_period_start)
-      : new Date(now.getFullYear(), now.getMonth(), 1);
-    const periodEnd = sub.current_period_end
-      ? new Date(sub.current_period_end)
-      : new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-    let { data: usage } = await admin
-      .from('usage')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('period_start', periodStart.toISOString())
-      .maybeSingle();
-
-    if (!usage) {
-      const { data: created, error } = await admin
+      let { data: usage } = await admin
         .from('usage')
-        .insert({
-          user_id: user.id,
-          period_start: periodStart.toISOString(),
-          period_end: periodEnd.toISOString(),
-          analyses_used: 0,
-          plan,
-        })
         .select('*')
-        .single();
-      if (error) throw error;
-      usage = created;
-    }
+        .eq('user_id', user.id)
+        .eq('period_start', periodStart.toISOString())
+        .maybeSingle();
 
-    if ((usage?.analyses_used ?? 0) >= quota) {
-      return jsonResponse({ error: 'Analysis quota exhausted for this period' }, 402);
+      if (!usage) {
+        const { data: created, error } = await admin
+          .from('usage')
+          .insert({
+            user_id: user.id,
+            period_start: periodStart.toISOString(),
+            period_end: periodEnd.toISOString(),
+            analyses_used: 0,
+            plan,
+          })
+          .select('*')
+          .single();
+        if (error) throw error;
+        usage = created;
+      }
+
+      if ((usage?.analyses_used ?? 0) >= quota) {
+        return jsonResponse(
+          { error: 'Analysis quota exhausted for this period', code: 'plan_quota_exhausted' },
+          402,
+        );
+      }
     }
 
     const analysisId = crypto.randomUUID();
@@ -137,3 +158,40 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: e instanceof Error ? e.message : 'Server error' }, 500);
   }
 });
+
+const IN_FLIGHT_STATUSES = ['pending_upload', 'uploaded', 'queued', 'processing'];
+const IN_FLIGHT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Lifetime analyses consumed by this user, for free-tier gating. */
+async function countFreeUsage(
+  admin: ReturnType<typeof adminClient>,
+  userId: string,
+): Promise<number> {
+  const since = new Date(Date.now() - IN_FLIGHT_WINDOW_MS).toISOString();
+  const [completed, inFlight, usageRows] = await Promise.all([
+    admin
+      .from('analyses')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'completed'),
+    admin
+      .from('analyses')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .in('status', IN_FLIGHT_STATUSES)
+      .gte('created_at', since),
+    admin.from('usage').select('analyses_used').eq('user_id', userId),
+  ]);
+  if (completed.error) throw completed.error;
+  if (inFlight.error) throw inFlight.error;
+  if (usageRows.error) throw usageRows.error;
+  const usageTotal = (usageRows.data ?? []).reduce(
+    (sum: number, r: { analyses_used: number | null }) => sum + (r.analyses_used ?? 0),
+    0,
+  );
+  return freeAnalysesUsed({
+    completedCount: completed.count ?? 0,
+    usageTotal,
+    inFlightCount: inFlight.count ?? 0,
+  });
+}

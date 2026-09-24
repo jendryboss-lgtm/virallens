@@ -9,6 +9,12 @@ export const PRODUCT_ID_YEARLY = PRODUCT_IDS.yearly;
 
 export const ENTITLEMENT_ID = 'virallens_pro';
 
+/**
+ * Free tier: non-Pro users get this many analyses per account lifetime, then the paywall.
+ * Server source of truth: supabase/functions/_shared/quotas.ts FREE_ANALYSES_LIMIT.
+ */
+export const FREE_ANALYSES_LIMIT = 3;
+
 export const QUOTAS = {
   trial: 3,
   monthly: 30,
