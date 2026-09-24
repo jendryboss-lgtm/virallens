@@ -29,7 +29,12 @@ Deno.serve(async (req) => {
   try {
     const secret = Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
     const auth = req.headers.get('Authorization') ?? '';
-    if (secret && auth !== `Bearer ${secret}`) {
+    // Fail closed: never process entitlement changes without a configured secret.
+    if (!secret) {
+      console.error('rc-webhook: REVENUECAT_WEBHOOK_SECRET not configured');
+      return jsonResponse({ error: 'Webhook not configured' }, 503);
+    }
+    if (auth !== `Bearer ${secret}`) {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
