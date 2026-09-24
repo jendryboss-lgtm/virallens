@@ -16,7 +16,7 @@ import {
   isUserCancelledError,
   purchasesErrorMessage,
 } from '@/lib/revenuecat';
-import { QUOTAS } from '@/lib/constants';
+import { FREE_ANALYSES_LIMIT, QUOTAS } from '@/lib/constants';
 import { colors, spacing, typography } from '@/theme';
 import { refreshBillingState } from './sync';
 import { useAuthStore } from '@/store';
@@ -235,8 +235,8 @@ export function PaywallPanel({ onSuccess }: Props) {
       )}
 
       <Text style={styles.trialNote}>
-        Trial quota: up to {QUOTAS.trial} completed analyses. Remaining counts are always shown in
-        the app.
+        Free: {FREE_ANALYSES_LIMIT} analyses to try ViralLens. Trial quota: up to {QUOTAS.trial}{' '}
+        completed analyses. Remaining counts are always shown in the app.
       </Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}

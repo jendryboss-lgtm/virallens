@@ -14,7 +14,9 @@ import {
   cancelAnalysis,
 } from '@/features/upload/api';
 import { useAuthStore, useBillingStore } from '@/store';
-import { canStartAnalysis } from '@/lib/quotas';
+import { canAnalyze } from '@/lib/quotas';
+import { FREE_ANALYSES_LIMIT } from '@/lib/constants';
+import { isPaymentRequiredError } from '@/lib/supabase';
 import { analysisStageProgress } from '@/lib/geminiHelpers';
 import { refreshBillingState } from '@/features/billing/sync';
 import type { Analysis } from '@/types/database';
@@ -41,7 +43,8 @@ function VideoPreview({ uri }: { uri: string }) {
 export default function UploadScreen() {
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id);
-  const { plan, analysesUsed, analysesRemaining, serverEntitled } = useBillingStore();
+  const { plan, analysesUsed, analysesRemaining, serverEntitled, freeAnalysesRemaining } =
+    useBillingStore();
   const [video, setVideo] = useState<PickedVideo | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [statusMsg, setStatusMsg] = useState<string>('');
@@ -122,10 +125,14 @@ export default function UploadScreen() {
       Alert.alert('Not configured', 'Set Supabase env vars before uploading.');
       return;
     }
-    if (!serverEntitled || !canStartAnalysis(plan, analysesUsed)) {
+    if (
+      !canAnalyze({ serverEntitled, plan, analysesUsed, freeRemaining: freeAnalysesRemaining })
+    ) {
       Alert.alert(
         'No analyses remaining',
-        `You have ${analysesRemaining} left on your current plan. Upgrade or wait for the next period.`,
+        serverEntitled
+          ? `You have ${analysesRemaining} left on your current plan. Wait for the next period or change plans.`
+          : `You've used your ${FREE_ANALYSES_LIMIT} free analyses. Upgrade to Pro to keep analyzing.`,
       );
       router.push('/(paywall)/index');
       return;
@@ -160,6 +167,11 @@ export default function UploadScreen() {
       if (cancelledRef.current) return;
       setPhase('error');
       setStatusMsg(e instanceof Error ? e.message : 'Upload failed');
+      if (isPaymentRequiredError(e)) {
+        // Server says quota exhausted — resync counts and show the paywall.
+        if (userId) refreshBillingState(userId).catch(() => undefined);
+        router.push('/(paywall)/index');
+      }
     }
   }
 
@@ -187,7 +199,9 @@ export default function UploadScreen() {
       <Text style={styles.title}>Check an unposted draft</Text>
       <Text style={styles.sub}>
         Pick a short from Camera Roll before you post. MP4/MOV/WebM · max 90s · max 100MB.
-        Remaining this period: {analysesRemaining}
+        {serverEntitled
+          ? `Remaining this period: ${analysesRemaining}`
+          : `Free analyses left: ${freeAnalysesRemaining} of ${FREE_ANALYSES_LIMIT}`}
       </Text>
 
       <Button title="Choose from Camera Roll" variant="secondary" onPress={pick} disabled={inFlight} />

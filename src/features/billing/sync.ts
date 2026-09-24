@@ -8,6 +8,8 @@ import {
 import {
   resolvePlanKind,
   remainingAnalyses,
+  freeAnalysesUsed,
+  freeAnalysesRemaining,
   type PlanKind,
 } from '@/lib/quotas';
 import { useBillingStore } from '@/store';
@@ -56,8 +58,17 @@ export async function refreshBillingState(userId: string): Promise<void> {
     .maybeSingle();
 
   const usage = usageRow as Usage | null;
-  const used = usage?.analyses_used ?? 0;
-  const remaining = remainingAnalyses(plan, used);
+  let used = usage?.analyses_used ?? 0;
+  let remaining = remainingAnalyses(plan, used);
+  let freeRemaining = 0;
+
+  if (!serverEntitled) {
+    // Free tier: lifetime allowance, counted the same way as create-upload.
+    const freeUsed = await fetchFreeAnalysesUsed(userId);
+    freeRemaining = freeAnalysesRemaining(freeUsed);
+    used = freeUsed;
+    remaining = freeRemaining;
+  }
 
   store.setCustomerInfo(customerInfo, {
     hasPro: serverEntitled,
@@ -65,11 +76,42 @@ export async function refreshBillingState(userId: string): Promise<void> {
     serverEntitled,
   });
   store.setUsage(used, remaining);
+  store.setFreeAnalysesRemaining(freeRemaining);
   store.setServerEntitled(serverEntitled, plan);
 
   if (hasProEntitlement(customerInfo) && !serverEntitled) {
     console.info('[Billing] RC entitled but server not yet — waiting for webhook.');
   }
+}
+
+const IN_FLIGHT_STATUSES = ['pending_upload', 'uploaded', 'queued', 'processing'];
+
+async function fetchFreeAnalysesUsed(userId: string): Promise<number> {
+  const sb = getSupabaseUntyped();
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const [completed, inFlight, usageRows] = await Promise.all([
+    sb
+      .from('analyses')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'completed'),
+    sb
+      .from('analyses')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .in('status', IN_FLIGHT_STATUSES)
+      .gte('created_at', since),
+    sb.from('usage').select('analyses_used').eq('user_id', userId),
+  ]);
+  const usageTotal = ((usageRows.data ?? []) as { analyses_used: number | null }[]).reduce(
+    (sum, r) => sum + (r.analyses_used ?? 0),
+    0,
+  );
+  return freeAnalysesUsed({
+    completedCount: completed.count ?? 0,
+    usageTotal,
+    inFlightCount: inFlight.count ?? 0,
+  });
 }
 
 export function planLabel(plan: PlanKind | PlanType): string {

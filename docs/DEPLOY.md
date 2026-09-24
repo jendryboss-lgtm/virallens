@@ -62,7 +62,7 @@ Confirm private bucket `videos` exists (created by migration).
 
 ### Pipeline (File API)
 
-1. `create-upload` — MIME / duration / size / AI consent / **server entitlement** / quota → signed URL  
+1. `create-upload` — MIME / duration / size / AI consent / **server entitlement** or free allowance (3 lifetime analyses for non-Pro) / quota → signed URL  
 2. Client uploads video  
 3. `enqueue-analysis` → `queued` → async `process-analysis`  
 4. `process-analysis` downloads video → **Gemini Files API** (upload → wait ACTIVE → generateContent with file URI → delete file) → Zod validate (1–2 JSON retries) → store result → increment usage → delete storage video  

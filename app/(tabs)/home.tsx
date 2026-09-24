@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router';
 import { Button, Card, DisclaimerBanner, Screen } from '@/components/ui';
 import { useAuthStore, useBillingStore } from '@/store';
 import { planLabel } from '@/features/billing/sync';
+import { FREE_ANALYSES_LIMIT } from '@/lib/constants';
 import { colors, spacing, typography } from '@/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
-  const { plan, analysesRemaining, analysesUsed, serverEntitled } = useBillingStore();
+  const { plan, analysesRemaining, analysesUsed, serverEntitled, freeAnalysesRemaining } =
+    useBillingStore();
 
   return (
     <Screen scroll>
@@ -21,10 +23,16 @@ export default function HomeScreen() {
       <Card style={styles.quota}>
         <Text style={styles.quotaLabel}>Plan</Text>
         <Text style={styles.quotaValue}>{planLabel(plan)}</Text>
-        <Text style={styles.quotaLabel}>Analyses remaining</Text>
+        <Text style={styles.quotaLabel}>
+          {serverEntitled ? 'Analyses remaining' : 'Free analyses remaining'}
+        </Text>
         <Text style={styles.quotaValue}>
-          {serverEntitled ? analysesRemaining : 0}
-          <Text style={styles.used}> ({analysesUsed} used this period)</Text>
+          {serverEntitled ? analysesRemaining : freeAnalysesRemaining}
+          <Text style={styles.used}>
+            {serverEntitled
+              ? ` (${analysesUsed} used this period)`
+              : ` of ${FREE_ANALYSES_LIMIT} free`}
+          </Text>
         </Text>
         {!serverEntitled ? (
           <Button

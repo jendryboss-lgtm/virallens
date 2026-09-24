@@ -4,6 +4,12 @@ export const QUOTAS = {
   annual: 40,
 } as const;
 
+/**
+ * Free tier: non-Pro users get this many analyses per account lifetime, then the paywall.
+ * Keep in sync with src/lib/constants.ts FREE_ANALYSES_LIMIT.
+ */
+export const FREE_ANALYSES_LIMIT = 3;
+
 export const PRODUCT_IDS = {
   monthly: 'monthly',
   yearly: 'yearly',
@@ -47,4 +53,24 @@ export function isProProductOrEntitlement(
     productId === PRODUCT_IDS.yearly ||
     productId === PRODUCT_IDS.lifetime
   );
+}
+
+/**
+ * Lifetime analyses consumed for free-tier gating.
+ * - completedCount: analyses rows with status 'completed'
+ * - usageTotal: sum of usage.analyses_used across all periods (service-role only, so it
+ *   survives users deleting their own analyses rows)
+ * - inFlightCount: recent analyses still pending/uploading/processing (prevents parallel bypass)
+ */
+export function freeAnalysesUsed(opts: {
+  completedCount: number;
+  usageTotal: number;
+  inFlightCount: number;
+}): number {
+  const done = Math.max(opts.completedCount || 0, opts.usageTotal || 0);
+  return done + Math.max(0, opts.inFlightCount || 0);
+}
+
+export function freeAnalysesRemaining(used: number): number {
+  return Math.max(0, FREE_ANALYSES_LIMIT - used);
 }

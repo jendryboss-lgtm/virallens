@@ -23,6 +23,7 @@ Production Expo (React Native + TypeScript) app for directional short-form video
 | Monthly | `monthly` — $9.99 · 30 analyses / billing period |
 | Yearly | `yearly` — maps to plan `annual` · 40 analyses / month |
 | Lifetime | `lifetime` — maps to plan `annual` quota (no schema change) |
+| Free | 3 analyses per account (lifetime) without Pro, then paywall — enforced in `create-upload` |
 | Trial | 3-day intro · ≤3 completed analyses |
 | Unlock rule | RevenueCat **webhook** sets `subscriptions.entitlement_active`. Client cannot unlock Pro by flipping local state. |
 | Paywall | Prefer `RevenueCatUI.presentPaywall` (see `docs/revenuecat-expo.md`) |
@@ -107,7 +108,7 @@ Service role key is injected automatically in Edge Functions.
 
 ### Pipeline
 
-1. App calls `create-upload` → server checks MIME / duration / size / AI consent / **server entitlement** / quota → returns signed upload URL.
+1. App calls `create-upload` → server checks MIME / duration / size / AI consent / **server entitlement** (or free allowance: 3 lifetime analyses for non-Pro) / quota → returns signed upload URL (402 + `code` when exhausted).
 2. App uploads video to signed URL.
 3. App calls `enqueue-analysis` → status `queued` → invokes `process-analysis` asynchronously.
 4. `process-analysis` downloads video, calls Gemini, validates JSON with Zod, stores result, increments usage, deletes raw video.
