@@ -28,6 +28,13 @@
         "APP_ENV": "development"
       }
     },
+    "preview-sim-ios16": {
+      "extends": "preview-sim",
+      "env": {
+        "APP_ENV": "development",
+        "VIRALLENS_IOS_DEPLOYMENT_TARGET": "16.2"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "channel": "preview",

@@ -4,6 +4,7 @@ All notable ViralLens milestones. Dates in America/Phoenix (PT).
 
 ## [Unreleased] — ops polish
 
+- EAS `preview-sim-ios16` profile (demo only): env-gated iOS 16.2 deployment target for Xcode 14.2 / iOS 16.2 Simulators
 - EAS `preview-sim` profile: standalone Release iOS Simulator build (JS bundled, no Metro) for demos
 - GitHub Actions CI on PR/push to `main` (`npm ci`, typecheck, lint, test)
 - In-app Privacy Policy and Terms of Use screens (placeholder copy from store listing)

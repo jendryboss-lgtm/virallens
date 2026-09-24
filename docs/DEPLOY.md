@@ -111,6 +111,22 @@ eas build --platform ios --profile preview-sim --non-interactive
 #       xcrun simctl launch booted com.virallens.app
 ```
 
+### iOS 16.2 Simulator demo build (older Macs / Xcode 14.2) — unsupported, demo only
+
+Expo SDK 56+ requires iOS **16.4** (all Expo pods declare `:ios => '16.4'`; `expo-modules-core`
+56.0.0, expo/expo#43296). Xcode 14.2 (last for macOS 12) only ships the iOS 16.2 runtime.
+`preview-sim-ios16` extends `preview-sim` and sets `VIRALLENS_IOS_DEPLOYMENT_TARGET=16.2`, which:
+
+- `app.config.js` → sets `ios.deploymentTarget` (Podfile.properties + Xcode project)
+- `postinstall` → `scripts/patch-ios-min-target.js` relaxes the Expo pods' / ExpoModulesJSI's
+  declared 16.4 floor to 16.2 (the Swift compiler still enforces API availability)
+
+Without that env var both are no-ops. **Never use for App Store / TestFlight builds.**
+
+```bash
+eas build --platform ios --profile preview-sim-ios16 --non-interactive
+```
+
 ```bash
 # iOS internal / TestFlight candidate
 eas build --platform ios --profile preview

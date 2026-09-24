@@ -13,7 +13,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.js",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "postinstall": "node scripts/patch-ios-min-target.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
