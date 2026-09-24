@@ -17,6 +17,17 @@
         "APP_ENV": "development"
       }
     },
+    "preview-sim": {
+      "distribution": "internal",
+      "environment": "development",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "APP_ENV": "development"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "channel": "preview",

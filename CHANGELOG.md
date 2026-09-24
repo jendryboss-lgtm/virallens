@@ -4,6 +4,7 @@ All notable ViralLens milestones. Dates in America/Phoenix (PT).
 
 ## [Unreleased] — ops polish
 
+- EAS `preview-sim` profile: standalone Release iOS Simulator build (JS bundled, no Metro) for demos
 - GitHub Actions CI on PR/push to `main` (`npm ci`, typecheck, lint, test)
 - In-app Privacy Policy and Terms of Use screens (placeholder copy from store listing)
 - Legal links from paywall, Settings, and Help
