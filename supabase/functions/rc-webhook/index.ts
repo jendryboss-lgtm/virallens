@@ -63,7 +63,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, test: true, type });
     }
 
-    if (!appUserId) return jsonResponse({ error: 'Missing app_user_id' }, 400);
+    if (!appUserId) {
+      // e.g. TRANSFER events carry transferred_from/transferred_to instead.
+      return jsonResponse({ ok: true, skipped: true, reason: 'missing_app_user_id', type });
+    }
 
     // app_user_id must be our Supabase auth user UUID (Purchases.logIn).
     if (!UUID_RE.test(appUserId)) {
@@ -102,14 +105,11 @@ Deno.serve(async (req) => {
       'UNCANCELLATION',
       'PRODUCT_CHANGE',
       'NON_RENEWING_PURCHASE',
+      'SUBSCRIPTION_EXTENDED',
       'TEMPORARY_ENTITLEMENT_GRANT',
+      'TRANSFER',
     ]);
-    const revokeEvents = new Set([
-      'CANCELLATION',
-      'EXPIRATION',
-      'BILLING_ISSUE',
-      'SUBSCRIBER_ALIAS',
-    ]);
+    const revokeEvents = new Set(['EXPIRATION', 'BILLING_ISSUE']);
 
     const hasProEntitlement = isProProductOrEntitlement(productId, entitlementIds);
 
@@ -122,18 +122,19 @@ Deno.serve(async (req) => {
       entitlementActive = true;
       status = isTrialing ? 'trialing' : 'active';
       plan = resolvePlanFromProduct(productId, isTrialing);
-    } else if (type === 'CANCELLATION' && hasProEntitlement) {
-      entitlementActive = true;
-      status = 'canceled';
-      plan = resolvePlanFromProduct(productId, isTrialing);
-    } else if (revokeEvents.has(type) || type === 'EXPIRATION') {
+    } else if (type === 'CANCELLATION') {
+      // Auto-renew off / refund. Still entitled until expiration unless RC dropped the entitlement.
+      entitlementActive = hasProEntitlement;
+      status = hasProEntitlement ? 'canceled' : 'expired';
+      plan = hasProEntitlement ? resolvePlanFromProduct(productId, isTrialing) : 'none';
+    } else if (revokeEvents.has(type)) {
       entitlementActive = false;
       status = type === 'BILLING_ISSUE' ? 'past_due' : 'expired';
       plan = 'none';
-    } else if (hasProEntitlement && type === 'TRANSFER') {
-      entitlementActive = true;
-      status = 'active';
-      plan = resolvePlanFromProduct(productId, isTrialing);
+    } else {
+      // Unhandled / informational events (SUBSCRIPTION_PAUSED, INVOICE_ISSUANCE,
+      // SUBSCRIBER_ALIAS, non-Pro products, ...) must never revoke entitlement.
+      return jsonResponse({ ok: true, skipped: true, reason: 'unhandled_event', type });
     }
 
     const { error } = await admin.from('subscriptions').upsert(
