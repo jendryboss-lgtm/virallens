@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRouter } from 'expo-router';
@@ -22,6 +22,7 @@ import { refreshBillingState } from '@/features/billing/sync';
 import type { Analysis } from '@/types/database';
 import { colors, spacing, typography } from '@/theme';
 import { isConfigured } from '@/lib/env';
+import { PAYWALL_HREF } from '@/lib/routes';
 
 type Phase = 'idle' | 'uploading' | 'queued' | 'processing' | 'done' | 'error' | 'cancelled';
 
@@ -121,6 +122,12 @@ export default function UploadScreen() {
 
   async function startUpload() {
     if (!video) return;
+    if (Platform.OS === 'web') {
+      // Web preview: upload + analysis pipeline is iPhone-only.
+      setPhase('error');
+      setStatusMsg('Web preview: uploads and analysis only work in the iPhone app. Try "Preview sample results".');
+      return;
+    }
     if (!isConfigured()) {
       Alert.alert('Not configured', 'Set Supabase env vars before uploading.');
       return;
@@ -134,7 +141,7 @@ export default function UploadScreen() {
           ? `You have ${analysesRemaining} left on your current plan. Wait for the next period or change plans.`
           : `You've used your ${FREE_ANALYSES_LIMIT} free analyses. Upgrade to Pro to keep analyzing.`,
       );
-      router.push('/(paywall)/index');
+      router.push(PAYWALL_HREF);
       return;
     }
 
@@ -170,7 +177,7 @@ export default function UploadScreen() {
       if (isPaymentRequiredError(e)) {
         // Server says quota exhausted — resync counts and show the paywall.
         if (userId) refreshBillingState(userId).catch(() => undefined);
-        router.push('/(paywall)/index');
+        router.push(PAYWALL_HREF);
       }
     }
   }
@@ -204,6 +211,11 @@ export default function UploadScreen() {
           : `Free analyses left: ${freeAnalysesRemaining} of ${FREE_ANALYSES_LIMIT}`}
       </Text>
 
+      {Platform.OS === 'web' ? (
+        <Text style={styles.webNote}>
+          Web preview: you can pick a file to see the flow, but analysis runs only in the iPhone app.
+        </Text>
+      ) : null}
       <Button title="Choose from Camera Roll" variant="secondary" onPress={pick} disabled={inFlight} />
       {!serverEntitled ? (
         <Button
@@ -258,6 +270,7 @@ const styles = StyleSheet.create({
   preview: { marginTop: spacing.xl, gap: spacing.md },
   video: { width: '100%', height: 280, backgroundColor: colors.bgElevated, borderRadius: 12 },
   meta: { ...typography.caption },
+  webNote: { ...typography.caption, color: colors.accent, marginBottom: spacing.md },
   progressCard: { marginTop: spacing.xl, gap: spacing.md },
   stage: { ...typography.label, color: colors.accent },
   status: { ...typography.body, color: colors.accent, textAlign: 'center' },

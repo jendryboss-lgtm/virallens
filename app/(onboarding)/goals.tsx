@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store';
 import { upsertProfile } from '@/features/auth/api';
 import type { GrowthGoal } from '@/types/database';
 import { spacing, typography } from '@/theme';
+import { PAYWALL_HREF } from '@/lib/routes';
 
 export default function GoalsScreen() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function GoalsScreen() {
         onboarding_completed: true,
       });
       setProfile(updated);
-      router.replace('/(paywall)/index');
+      router.replace(PAYWALL_HREF);
     } finally {
       setLoading(false);
     }
