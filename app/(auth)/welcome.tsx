@@ -22,6 +22,11 @@ export default function WelcomeScreen() {
           variant="secondary"
           onPress={() => router.push('/(auth)/sign-in')}
         />
+        <Button
+          title="Preview sample results"
+          variant="ghost"
+          onPress={() => router.push('/analysis/demo')}
+        />
       </View>
       <DisclaimerBanner />
     </Screen>
