@@ -27,8 +27,15 @@ export function RootNavigator() {
       return;
     }
 
+    // Public while signed out: client-only sample results, help/legal, and a paywall preview.
+    const isPublicPreview =
+      inPaywall ||
+      (segments[0] === 'analysis' && (segments as string[])[1] === 'demo') ||
+      segments[0] === 'help' ||
+      segments[0] === 'legal';
+
     if (!session) {
-      if (!inAuth) router.replace('/(auth)/welcome');
+      if (!inAuth && !isPublicPreview) router.replace('/(auth)/welcome');
       return;
     }
 
