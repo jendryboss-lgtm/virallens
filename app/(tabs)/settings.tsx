@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Chip, Screen, TextField } from '@/components/ui';
-import { useAuthStore, useBillingStore } from '@/store';
+import { useAuthStore, useBillingStore, useDemoStore } from '@/store';
 import { signOut } from '@/features/auth/api';
 import { updatePreferences, deleteAccountAndData } from '@/features/settings/api';
 import {
@@ -19,6 +19,12 @@ import {
 } from '@/features/onboarding/prefs';
 import { colors, spacing, typography } from '@/theme';
 import type { ExperienceLevel, GrowthGoal, NichePref, PlatformPref } from '@/types/database';
+import { HELP_HREF, PAYWALL_HREF } from '@/lib/routes';
+
+/** Alert.alert is a no-op on react-native-web; use the browser alert there. */
+function webNotice(message: string) {
+  if (typeof window !== 'undefined' && typeof window.alert === 'function') window.alert(message);
+}
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -27,6 +33,7 @@ export default function SettingsScreen() {
   const setProfile = useAuthStore((s) => s.setProfile);
   const resetAuth = useAuthStore((s) => s.reset);
   const resetBilling = useBillingStore((s) => s.reset);
+  const exitWebGuest = useDemoStore((s) => s.exitWebGuest);
   const { plan, analysesRemaining, serverEntitled, freeAnalysesRemaining } = useBillingStore();
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
@@ -38,7 +45,10 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
 
   async function savePrefs() {
-    if (!user) return;
+    if (!user) {
+      if (Platform.OS === 'web') webNotice('Demo mode: sign in on the iPhone app to save preferences.');
+      return;
+    }
     setSaving(true);
     try {
       const updated = await updatePreferences(user.id, {
@@ -59,6 +69,10 @@ export default function SettingsScreen() {
   }
 
   async function onRestore() {
+    if (Platform.OS === 'web') {
+      webNotice('Purchases only work in the iPhone app.');
+      return;
+    }
     try {
       const info = await restorePurchases();
       if (user) await refreshBillingState(user.id);
@@ -74,16 +88,21 @@ export default function SettingsScreen() {
   }
 
   async function onManageSubscription() {
+    if (Platform.OS === 'web') {
+      webNotice('Purchases only work in the iPhone app.');
+      return;
+    }
     try {
       // Customer Center when RC configured; otherwise opens store subscription URL.
       await presentCustomerCenter();
     } catch {
-      router.push('/(paywall)/index');
+      router.push(PAYWALL_HREF);
     }
   }
 
   async function onSignOut() {
-    await signOut();
+    exitWebGuest();
+    await signOut().catch(() => undefined);
     resetAuth();
     resetBilling();
     router.replace('/(auth)/welcome');
@@ -123,7 +142,7 @@ export default function SettingsScreen() {
           ? `${analysesRemaining} analyses left`
           : `${freeAnalysesRemaining} free analyses left`}
       </Text>
-      <Button title="Upgrade / plans" variant="secondary" onPress={() => router.push('/(paywall)/index')} />
+      <Button title="Upgrade / plans" variant="secondary" onPress={() => router.push(PAYWALL_HREF)} />
       <Button title="Manage subscription" variant="ghost" onPress={onManageSubscription} />
       <Button title="Restore purchases" variant="ghost" onPress={onRestore} />
 
@@ -168,7 +187,7 @@ export default function SettingsScreen() {
       <Button title="Save preferences" loading={saving} onPress={savePrefs} />
 
       <Text style={styles.section}>Help & legal</Text>
-      <Button title="Help & support" variant="secondary" onPress={() => router.push('/help/index')} />
+      <Button title="Help & support" variant="secondary" onPress={() => router.push(HELP_HREF)} />
       <Button title="Privacy policy" variant="ghost" onPress={() => router.push('/legal/privacy')} />
       <Button title="Terms of use" variant="ghost" onPress={() => router.push('/legal/terms')} />
 

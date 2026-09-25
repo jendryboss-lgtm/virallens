@@ -6,6 +6,7 @@ import { useAuthStore, useBillingStore } from '@/store';
 import { planLabel } from '@/features/billing/sync';
 import { FREE_ANALYSES_LIMIT } from '@/lib/constants';
 import { colors, spacing, typography } from '@/theme';
+import { PAYWALL_HREF } from '@/lib/routes';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export default function HomeScreen() {
         {!serverEntitled ? (
           <Button
             title="Unlock Pro"
-            onPress={() => router.push('/(paywall)/index')}
+            onPress={() => router.push(PAYWALL_HREF)}
             style={{ marginTop: spacing.md }}
           />
         ) : null}

@@ -1,11 +1,13 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Screen, DisclaimerBanner } from '@/components/ui';
 import { colors, spacing, typography } from '@/theme';
+import { useDemoStore } from '@/store';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const enterWebGuest = useDemoStore((s) => s.enterWebGuest);
   return (
     <Screen contentStyle={styles.content}>
       <View style={styles.hero}>
@@ -22,6 +24,22 @@ export default function WelcomeScreen() {
           variant="secondary"
           onPress={() => router.push('/(auth)/sign-in')}
         />
+        {Platform.OS === 'web' ? (
+          <>
+            <Button
+              title="Explore demo (web preview)"
+              variant="ghost"
+              onPress={() => {
+                enterWebGuest();
+                router.replace('/(tabs)/home');
+              }}
+            />
+            <Text style={styles.demoNote}>
+              Web preview: browse screens without an account. Uploads and purchases need the
+              iPhone app.
+            </Text>
+          </>
+        ) : null}
       </View>
       <DisclaimerBanner />
     </Screen>
@@ -34,4 +52,5 @@ const styles = StyleSheet.create({
   brand: { ...typography.hero, color: colors.primary },
   tagline: { ...typography.bodySecondary },
   actions: { gap: spacing.md, marginVertical: spacing.xl },
+  demoNote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
 });

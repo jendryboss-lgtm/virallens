@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { useRouter, useSegments } from 'expo-router';
-import { useAuthStore, useBillingStore } from '@/store';
+import { useAuthStore, useBillingStore, useDemoStore } from '@/store';
 import { isConfigured } from '@/lib/env';
+import { PAYWALL_HREF } from '@/lib/routes';
 
 /**
  * Gate routing: splash → auth → onboarding → tabs (Pro, or free analyses left) / paywall (free analyses used up)
@@ -14,6 +15,7 @@ export function RootNavigator() {
   const profile = useAuthStore((s) => s.profile);
   const serverEntitled = useBillingStore((s) => s.serverEntitled);
   const freeRemaining = useBillingStore((s) => s.freeAnalysesRemaining);
+  const webGuest = useDemoStore((s) => s.webGuest);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -21,6 +23,14 @@ export function RootNavigator() {
     const inAuth = segments[0] === '(auth)';
     const inOnboarding = segments[0] === '(onboarding)';
     const inPaywall = segments[0] === '(paywall)';
+
+    if (webGuest && !session) {
+      // Web preview "Explore demo" guest: no gating, all screens browsable.
+      if (segments[0] === 'index' || (segments as string[]).length === 0) {
+        router.replace('/(tabs)/home');
+      }
+      return;
+    }
 
     if (!isConfigured()) {
       // Allow browsing UI without backend for local review of screens
@@ -47,7 +57,7 @@ export function RootNavigator() {
       }
       // Free analyses used up: paywall first (tabs / sample stay reachable via "Not now").
       if (!inPaywall && segments[0] !== '(tabs)' && segments[0] !== 'analysis') {
-        router.replace('/(paywall)/index');
+        router.replace(PAYWALL_HREF);
       }
       return;
     }
@@ -55,7 +65,7 @@ export function RootNavigator() {
     if (inAuth || inOnboarding || inPaywall || segments[0] === 'index') {
       router.replace('/(tabs)/home');
     }
-  }, [hydrated, session, profile, serverEntitled, freeRemaining, segments, router]);
+  }, [hydrated, session, profile, serverEntitled, freeRemaining, segments, router, webGuest]);
 
   return null;
 }

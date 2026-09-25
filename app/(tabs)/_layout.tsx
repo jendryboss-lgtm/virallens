@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 import { colors } from '@/theme';
 
 function TabLabel({ label, focused }: { label: string; focused: boolean }) {
@@ -22,6 +22,8 @@ export default function TabsLayout() {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
+        // Web: no icon set is configured, so hide the placeholder glyph boxes.
+        ...(Platform.OS === 'web' ? { tabBarIconStyle: { display: 'none' as const } } : null),
       }}
     >
       <Tabs.Screen

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { PurchasesOfferings, PurchasesPackage } from 'react-native-purchases';
 import { Button, Card, DisclaimerBanner } from '@/components/ui';
@@ -25,6 +25,9 @@ interface Props {
   onSuccess?: () => void;
 }
 
+const IS_WEB = Platform.OS === 'web';
+const WEB_NOTICE = 'Purchases only work in the iPhone app.';
+
 type LoadKind = 'paywall' | 'monthly' | 'yearly' | 'lifetime' | 'restore' | 'manage' | null;
 
 export function PaywallPanel({ onSuccess }: Props) {
@@ -37,6 +40,11 @@ export function PaywallPanel({ onSuccess }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    if (IS_WEB) {
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!isRevenueCatConfigured()) {
       queueMicrotask(() => {
         if (!cancelled) {
@@ -102,6 +110,10 @@ export function PaywallPanel({ onSuccess }: Props) {
   }
 
   async function buy(pkg: PurchasesPackage | null, kind: 'monthly' | 'yearly' | 'lifetime') {
+    if (IS_WEB) {
+      setError(WEB_NOTICE);
+      return;
+    }
     if (!pkg) {
       Alert.alert('Unavailable', 'This product is not available in the current offering.');
       return;
@@ -124,6 +136,10 @@ export function PaywallPanel({ onSuccess }: Props) {
   }
 
   async function onRestore() {
+    if (IS_WEB) {
+      setError(WEB_NOTICE);
+      return;
+    }
     setLoading('restore');
     setError(null);
     try {
@@ -138,6 +154,10 @@ export function PaywallPanel({ onSuccess }: Props) {
   }
 
   async function onManage() {
+    if (IS_WEB) {
+      setError(WEB_NOTICE);
+      return;
+    }
     setLoading('manage');
     try {
       await presentCustomerCenter();
@@ -157,6 +177,14 @@ export function PaywallPanel({ onSuccess }: Props) {
         Start a 3-day intro trial where offered. Analyze shorts with directional scores,
         improvements, and revision ideas — never marketed as unlimited.
       </Text>
+
+      {IS_WEB ? (
+        <Card style={styles.webNotice}>
+          <Text style={styles.webNoticeText}>
+            Web preview — {WEB_NOTICE} Plans are shown for reference only.
+          </Text>
+        </Card>
+      ) : null}
 
       {isRevenueCatConfigured() ? (
         <Button
@@ -293,6 +321,8 @@ const styles = StyleSheet.create({
   trial: { ...typography.caption, color: colors.accent },
   trialNote: { ...typography.caption },
   error: { ...typography.caption, color: colors.danger },
+  webNotice: { borderColor: colors.accent },
+  webNoticeText: { ...typography.caption, color: colors.accent },
   legal: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
   link: { ...typography.caption, color: colors.accent, textDecorationLine: 'underline' },
   dot: { ...typography.caption },
