@@ -152,40 +152,50 @@ export async function generateContentWithFile(opts: {
   temperature?: number;
 }): Promise<{ text: string; raw: unknown; blocked: boolean; blockReason?: string }> {
   const model = opts.model ?? DEFAULT_MODEL;
-  const res = await fetch(
-    `${FILES_BASE}/v1beta/models/${model}:generateContent?key=${opts.apiKey}`,
-    {
-      method: 'POST',
-      signal: opts.signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
+  const requestBody = JSON.stringify({
+    contents: [
+      {
+        parts: [
+          { text: opts.prompt },
           {
-            parts: [
-              { text: opts.prompt },
-              {
-                file_data: {
-                  mime_type: opts.mimeType,
-                  file_uri: opts.fileUri,
-                },
-              },
-            ],
+            file_data: {
+              mime_type: opts.mimeType,
+              file_uri: opts.fileUri,
+            },
           },
         ],
-        generationConfig: {
-          temperature: opts.temperature ?? 0.4,
-          responseMimeType: 'application/json',
-        },
-      }),
+      },
+    ],
+    generationConfig: {
+      temperature: opts.temperature ?? 0.4,
+      responseMimeType: 'application/json',
     },
-  );
+  });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini generateContent error ${res.status}: ${errText.slice(0, 500)}`);
+  let res: Response | null = null;
+  let errText = '';
+  for (let attempt = 0; attempt < 4; attempt++) {
+    res = await fetch(
+      `${FILES_BASE}/v1beta/models/${model}:generateContent?key=${opts.apiKey}`,
+      {
+        method: 'POST',
+        signal: opts.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+      },
+    );
+    if (res.ok) break;
+    errText = await res.text();
+    const retryable = res.status === 503 || res.status === 429;
+    if (!retryable || attempt === 3) {
+      throw new Error(`Gemini generateContent error ${res.status}: ${errText.slice(0, 500)}`);
+    }
+    const delayMs = 2000 * (attempt + 1) * (attempt + 1);
+    console.warn(`Gemini ${res.status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/4)`);
+    await sleep(delayMs, opts.signal);
   }
 
-  const raw = await res.json();
+  const raw = await res!.json();
   const blockReason =
     raw?.promptFeedback?.blockReason ??
     raw?.candidates?.[0]?.finishReason === 'SAFETY'
