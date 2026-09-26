@@ -4,7 +4,7 @@
  */
 
 const FILES_BASE = 'https://generativelanguage.googleapis.com';
-const DEFAULT_MODEL = 'gemini-3.8-flash';
+const DEFAULT_MODEL = 'gemini-flash-latest';
 
 export interface GeminiFileRef {
   name: string;
