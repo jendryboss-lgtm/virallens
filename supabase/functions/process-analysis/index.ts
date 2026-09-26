@@ -29,8 +29,37 @@ Deno.serve(async (req) => {
 
   try {
     const auth = req.headers.get('Authorization') ?? '';
+    const apiKeyHeader = req.headers.get('apikey') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    if (!auth.includes(serviceKey)) {
+
+    // Edge runtime may inject the new sb_secret_* key while callers still send the
+    // legacy service_role JWT. Accept either.
+    const bearerToken = auth.replace(/^Bearer\s+/i, '').trim();
+    let jwtRole: string | null = null;
+    if (bearerToken.split('.').length === 3) {
+      try {
+        const payload = JSON.parse(atob(bearerToken.split('.')[1]!));
+        jwtRole = typeof payload.role === 'string' ? payload.role : null;
+      } catch {
+        jwtRole = null;
+      }
+    }
+
+    const authorized =
+      (!!serviceKey &&
+        (auth.includes(serviceKey) ||
+          apiKeyHeader === serviceKey ||
+          bearerToken === serviceKey)) ||
+      jwtRole === 'service_role';
+
+    if (!authorized) {
+      console.error('process-analysis auth failed', {
+        authLen: auth.length,
+        apiKeyLen: apiKeyHeader.length,
+        serviceKeyLen: serviceKey.length,
+        authHasBearer: auth.startsWith('Bearer '),
+        jwtRole,
+      });
       return jsonResponse({ error: 'Forbidden' }, 403);
     }
 
